@@ -1,0 +1,118 @@
+Expanded Project Idea 2: Psychoacoustically-Informed Adversarial Attacks on Speech Recognition Systems
+
+This project focuses on creating imperceptible adversarial attacks on speech recognition models by leveraging psychoacoustic principles. Below is a comprehensive guideline to help you get started and guide you through each step.
+
+1. Project Overview
+	•	Goal: Generate adversarial examples for speech recognition systems (e.g., Wav2Vec 2.0, DeepSpeech) such that the perturbations are imperceptible to human listeners but cause the model to misclassify.
+	•	Key Concept: Use psychoacoustic masking (the inability of the human ear to detect sounds in certain frequency bands when louder sounds are present) to hide the adversarial noise in frequencies where humans are less sensitive.
+
+2. Steps and Guidelines
+
+Step 1: Research and Preparation
+	•	Literature Review: Start by understanding adversarial attacks on audio models:
+	•	Key papers:
+	•	Carlini and Wagner’s attack on audio recognition models (CW Attack)
+	•	“CommanderSong” hidden voice attacks on smart speakers
+	•	Key adversarial attack methods:
+	•	FGSM (Fast Gradient Sign Method)
+	•	PGD (Projected Gradient Descent)
+	•	Carlini-Wagner   attacks
+	•	Psychoacoustic Theory: Research perceptual masking and STFT-based (Short-Time Fourier Transform) representations:
+	•	Masking effects: Low-energy sounds near high-energy regions are harder to hear.
+	•	Time-frequency representation: Human perception is more sensitive to some frequency bands.
+
+Step 2: Choose a Speech Recognition Model
+	•	Open-source models to use:
+	•	DeepSpeech: Lightweight, well-documented ASR model.
+	•	Wav2Vec 2.0 (Hugging Face): Pre-trained speech-to-text model with strong performance.
+	•	Whisper (OpenAI): Robust speech recognition model trained on diverse audio datasets.
+	•	Installation and setup:
+	•	Install the models via transformers (for Wav2Vec) or whisper library:
+
+pip install transformers torchaudio openai-whisper
+
+
+
+Step 3: Create a Baseline Speech Recognition Pipeline
+	•	Prepare an audio input pipeline:
+
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
+import torch
+import librosa
+
+# Load Wav2Vec2 model
+model_name = "facebook/wav2vec2-base-960h"
+model = Wav2Vec2ForCTC.from_pretrained(model_name)
+processor = Wav2Vec2Processor.from_pretrained(model_name)
+
+# Load audio file
+audio, sr = librosa.load("audio_sample.wav", sr=16000)
+inputs = processor(audio, sampling_rate=sr, return_tensors="pt", padding=True)
+
+# Inference
+with torch.no_grad():
+    logits = model(inputs.input_values).logits
+transcription = processor.batch_decode(torch.argmax(logits, dim=-1))
+print("Transcription:", transcription)
+
+Step 4: Implement the Psychoacoustic Adversarial Attack
+	•	Attack Strategy: Add noise in the frequency domain using STFT while ensuring perceptual imperceptibility.
+
+	1.	Generate Short-Time Fourier Transform (STFT) of the Audio:
+
+import torch
+from torchaudio.transforms import Spectrogram
+
+n_fft = 400  # Window size
+spectrogram = Spectrogram(n_fft=n_fft)(torch.tensor(audio).unsqueeze(0))
+
+
+	2.	Apply Perturbation in Frequency Bins:
+	•	Add small perturbations to frequencies where the energy is low:
+
+perturbation = torch.randn_like(spectrogram) * 0.01  # Small noise in low-energy areas
+perturbed_spectrogram = spectrogram + perturbation
+
+
+	3.	Invert the STFT (ISTFT) to Time Domain:
+	•	Convert the perturbed spectrogram back to waveform:
+
+from torchaudio.transforms import InverseSpectrogram
+
+istft = InverseSpectrogram(n_fft=n_fft)
+perturbed_audio = istft(perturbed_spectrogram).squeeze(0).numpy()
+
+Step 5: Adversarial Loss Function (CW Loss or CTC Loss)
+	•	Define a loss function to make the transcription targeted or untargeted:
+
+target_transcription = "delete all files"
+ctc_loss = torch.nn.CTCLoss(blank=processor.tokenizer.pad_token_id)
+
+# Calculate CTC loss between predicted logits and target transcription
+loss = ctc_loss(logits, target_transcription_encoded)
+
+Step 6: Evaluate Effectiveness
+	•	Metrics:
+	•	Word Error Rate (WER): Measure the error rate before and after the attack.
+	•	Perceptual Quality: Compute Signal-to-Noise Ratio (SNR) and Perceptual Evaluation of Speech Quality (PESQ) score to measure audio quality.
+
+from pypesq import pesq
+pesq_score = pesq(sr, audio, perturbed_audio, 'wb')
+print(f"PESQ score: {pesq_score}")
+
+Step 7: Experimentation
+	•	Run experiments for:
+	•	Different levels of noise (epsilon in PGD).
+	•	Different psychoacoustic masking thresholds (attack frequencies humans cannot detect).
+	•	Comparison between time-domain and frequency-domain perturbations.
+
+What to Research Further:
+	•	Psychoacoustic masking curves (how much energy is needed for perturbations to remain inaudible).
+	•	Temporal vs. frequency-domain attacks.
+	•	Robustness of different speech models to adversarial perturbations.
+
+Potential Extension:
+	•	Implement defenses such as adversarial training or STFT-based denoising and test their effectiveness.
+	•	Explore hiding adversarial noise in “natural sounds” (like background music) to create stealthier attacks.
+
+Would you like sample code for PGD/STFT-based perturbations, or do you want to focus on a specific attack type?
