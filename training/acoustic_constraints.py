@@ -62,6 +62,3 @@ def perturbation_psychoacoustic_constraints(p):
     # ensuere norm
     p = Lp_norm(p)
     return p
-
-def get_bonus_for_imperceptibility(x,pert):
-    pass
