@@ -1,0 +1,4 @@
+run the following
+source ~/miniconda3/etc/profile.d/conda.sh
+then
+conda activate cs236207

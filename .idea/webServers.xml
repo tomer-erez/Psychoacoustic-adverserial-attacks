@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="8d0ca20c-c790-4e45-bb2a-d061859876bc" name="psycho_attacks">
+        <fileTransfer rootFolder="/home/tomer.erez/psychoacoustic_attacks" accessType="SFTP" host="newton.cs.technion.ac.il" port="22" sshConfigId="75aa1bca-c807-4862-9d11-426f4ec47a1e" sshConfig="tomer.erez@newton.cs.technion.ac.il:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

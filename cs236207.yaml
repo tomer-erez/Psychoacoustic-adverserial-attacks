@@ -1,0 +1,23 @@
+name: cs236207
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - fastai
+  - defaults
+dependencies:
+  - pytorch==2.5.0
+  - torchvision==0.20.0
+  - torchaudio==2.5.0
+  - pytorch-cuda=12.1
+  - cuda-cudart-dev=12.1
+  - opencv-python-headless
+  - datasets
+  - soundfile
+  - librosa
+  - pip
+  - transformers
+  - librosa
+  - pip:
+      - git+https://github.com/fra31/auto-attack
+      - git+https://github.com/RobustBench/robustbench.git
