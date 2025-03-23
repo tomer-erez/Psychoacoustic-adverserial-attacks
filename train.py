@@ -44,8 +44,8 @@ def perturbation_constraint(p_tensor, args):
     elif args.norm_type == 'leakage':
         # If not handled above, apply leakage mask now (time-domain or freq-domain inside the function)
         p_tensor = projections.apply_leakage_mask(p_tensor, args)
-
     return p_tensor
+
 
 def get_loss_for_training(model, p, original_waveforms, target_texts, processor, args):
     p=perturbation_constraint(p, args)
