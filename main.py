@@ -7,32 +7,29 @@ import torch
 
 if __name__ == '__main__':
     args = parser.create_arg_parser().parse_args()
-    args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    logger=build.create_logger(args)
-    train_data_loader, eval_data_loader,test_data_loader = build.create_data_loaders(args)
-    model = build.load_model(args)
-    p=build.init_perturbation(args)
+    args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger=build.create_logger(args=args)
+    train_data_loader, eval_data_loader,test_data_loader,audio_length = build.create_data_loaders(args=args,logger=logger)
+    model,processor = build.load_model(args)
+    p = build.init_perturbation(args,length=audio_length)
     optimizer = build.create_perturbation_optimizer(args=args, p=p)
-    loss_fn = build.create_loss_fn(args)
 
     train_scores = []
     eval_scores = []
     no_improve_epochs=0
     best_eval_score = -1*float('inf')
 
-    for epoch in range(args.epochs):
+    for epoch in range(args.num_epochs):
         p, train_epoch_score = train.train_epoch(
             args=args, train_data_loader=train_data_loader, p=p,
-            model=model, optimizer=optimizer, criterion=loss_fn,
-            epoch=epoch, logger=logger
+            model=model, optimizer=optimizer,
+            epoch=epoch, logger=logger, processor=processor
         )
         train_scores.append(train_epoch_score)
-
         eval_epoch_score = eval.evaluate(
             args=args, eval_data_loader=eval_data_loader, p=p,
-            model=model, criterion=loss_fn, logger=logger,
-            perturbed=True, epoch_number=epoch
+            model=model, logger=logger,
+            perturbed=True, epoch_number=epoch, processor=processor
         )
         eval_scores.append(eval_epoch_score)
 
@@ -46,14 +43,14 @@ if __name__ == '__main__':
             break
 
     perturbed_test_score = eval.evaluate( #eval perturbation
-        args=args, eval_data_loader=eval_data_loader, p=p,
-        model=model, criterion=loss_fn, logger=logger,
-        perturbed=True, epoch_number=-1
+        args=args, eval_data_loader=test_data_loader, p=p,
+        model=model, logger=logger,
+        perturbed=True, epoch_number=-1, processor=processor
     )
     clean_test_score = eval.evaluate( #eval clean model
-        args=args, eval_data_loader=eval_data_loader, p=torch.zeros_like(p),
-        model=model, criterion=loss_fn, logger=logger,
-        perturbed=False, epoch_number=-1
+        args=args, eval_data_loader=test_data_loader, p=torch.zeros_like(p),
+        model=model, logger=logger,
+        perturbed=False, epoch_number=-1, processor=processor
     )
     logger.info(f"Summary:\n"
                 f"Perturbation norm type: {args.norm_type}\t"

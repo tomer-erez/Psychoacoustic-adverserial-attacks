@@ -2,6 +2,8 @@ import torch
 import projections
 import fourier_transforms
 
+def avg_scores(scores):
+    return sum(scores) / len(scores)
 
 def perturbation_constraint(p_tensor, args):
     """
@@ -24,10 +26,12 @@ def perturbation_constraint(p_tensor, args):
     # --- Time-domain projection constraints ---
 
     if args.norm_type in ['freq_l2', 'time_l2']:
-        p_tensor = projections.project_l2(p_tensor, args.epsilon)
+        p_tensor = projections.project_l2(p_tensor, args.pert_size)
+    elif args.norm_type=="l2":
+        p_tensor = projections.project_l2(p_tensor, args.pert_size)
 
     elif args.norm_type == 'linf':
-        p_tensor = torch.clamp(p_tensor, -args.epsilon, args.epsilon)
+        p_tensor = torch.clamp(p_tensor, -args.pert_size, args.pert_size)
 
     elif args.norm_type == 'snr':
         # Project to target SNR vs zero signal (pure noise constraint)
@@ -43,26 +47,31 @@ def perturbation_constraint(p_tensor, args):
 
     return p_tensor
 
+def get_loss_for_training(model, p, original_waveforms, target_texts, processor, args):
+    p=perturbation_constraint(p, args)
+    perturbed_waveforms = (original_waveforms + p).requires_grad_()
+    labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(args.device)
+    labels[labels == processor.tokenizer.pad_token_id] = -100
+    outputs = model(input_values=perturbed_waveforms, labels=labels)
+    return outputs.loss, outputs.logits
 
-def train_epoch(args, train_data_loader, p, model, optimizer, criterion, epoch, logger):
+
+
+def train_epoch(args, train_data_loader, p, model, optimizer, epoch, logger,processor):
     scores = []
-    model.train()
-
-    for data, labels in train_data_loader:
+    model.eval()
+    for batch_idx,(data, target_texts) in enumerate(train_data_loader):
         optimizer.zero_grad()
-
-        x_pert = data + p
-        y_pred = model(x_pert)
-
-        loss = criterion(y_pred, labels)
+        data=data.to(args.device)
+        data.requires_grad=False
+        loss, _ = get_loss_for_training(model=model,p=p, original_waveforms=data,target_texts=target_texts,processor=processor,args=args)
         scores.append(loss.item())
-
-        loss.backward()
+        (-loss).backward()  # maximize loss
         optimizer.step()
 
-        # Apply constraint to p in-place
-        p.data = perturbation_constraint(p.data, args)
+        if batch_idx % args.report_interval == 0:
+            logger.info(f"batch: {batch_idx}/{len(train_data_loader)},avg_score {avg_scores(scores)}")
 
-    avg_score = sum(scores) / len(scores) if scores else float('inf')
+    avg_score = avg_scores(scores)
     logger.info(f"Train epoch number: {epoch}, avg score: {avg_score:.4f}")
     return p, scores
