@@ -16,6 +16,7 @@ dependencies:
   - soundfile
   - pip
   - transformers
+  - matplotlib
   - librosa
   - pip:
       - git+https://github.com/fra31/auto-attack

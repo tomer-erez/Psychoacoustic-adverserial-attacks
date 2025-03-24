@@ -25,7 +25,7 @@ def collate_fn(batch):
 
 # === 1. Load dataset
 print("Loading dataset...")
-LIBRISPEECH_PATH = r"train-clean-100"
+LIBRISPEECH_PATH = r"../train-clean-100"
 ds = torchaudio.datasets.LIBRISPEECH(
     root=LIBRISPEECH_PATH,
     url="train-clean-100",
@@ -51,7 +51,7 @@ B, T = waveforms.shape
 
 # === 4. Init perturbation: [1, T]
 waveforms.requires_grad = False
-perturbation = (torch.randn(1, T, device=device) / 100).detach().requires_grad_()
+perturbation = (torch.randn(1, T, device=device) / 150).detach().requires_grad_()
 print(f"\nwaveform device: {waveforms.device}\t waveform shape {waveforms.shape}\t requires grad: {waveforms.requires_grad}")
 print(f"perturbation device: {perturbation.device} perturbation shape {perturbation.shape} requires grad: {perturbation.requires_grad}")
 
@@ -92,8 +92,8 @@ def decode(logits):
 
 def get_loss_for_training(perturbation, original_waveforms, target_texts):
     # Clamp here (still differentiable)
-    clamped_perturb = torch.clamp(perturbation, -0.95, 0.95)
-    perturbed_waveforms = (original_waveforms + clamped_perturb).requires_grad_()
+    perturbation = torch.clamp(perturbation, -0.03, 0.03)
+    perturbed_waveforms = original_waveforms + perturbation
     # Tokenize labels
     labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(device)
     labels[labels == processor.tokenizer.pad_token_id] = -100
@@ -111,16 +111,13 @@ print(f"Loss (clean): {loss_clean.item():.4f}")
 
 # === 7. Optimize Perturbation
 print("\n=== Optimizing Perturbation ===")
-optimizer = torch.optim.AdamW([perturbation], lr=4e-5)
-for step in range(1, 4):
+optimizer = torch.optim.AdamW([perturbation], lr=4e-3)
+model.eval()
+for step in range(1, 6):
     optimizer.zero_grad()
     loss, _ = get_loss_for_training(perturbation, waveforms, texts)
     (-loss).backward()
-    if perturbation.grad is not None:
-        print(f"Step {step}, loss: {loss.item():.4f}")
-        print("Perturbation grad mean:", perturbation.grad.mean().item())
-    else:
-        print(f"Step {step}, loss: {loss.item():.4f}, grad is None!")
+    print(f"Step {step}, loss: {loss.item():.4f}")
     optimizer.step()
 
     # torch.cuda.empty_cache()
@@ -142,4 +139,4 @@ def save_audio(filename, tensor, sample_rate=16000, amplify=1.0):
 os.makedirs("./trash", exist_ok=True)
 save_audio("trash/clean.wav", waveforms[0])
 save_audio("trash/perturbed.wav", final_input[0])
-save_audio("trash/perturbation.wav", perturbation[0] * 5)
+save_audio("trash/perturbation.wav", perturbation[0])
