@@ -47,14 +47,13 @@ def project_min_max_freqs(args,stft_p, min_freq, max_freq):
     return stft_p
 
 
-def compute_fm_weighted_norm(stft_p, args):
+def compute_fm_weighted_norm(stft_p, args,weights,freqs):
     """
     Computes perceptual (FM-weighted) norm of the STFT of the perturbation.
     Uses precomputed frequency weights in args.weights.
     """
 
     # Assume: args.weights is a [F] tensor matching the STFT's frequency bins
-    weights = args.weights  # [F]
     weights = weights.view(1, -1, 1)   # [1, F, 1] for broadcasting with [B, F, T]
 
     # Apply FM-weighted norm
@@ -65,11 +64,11 @@ def compute_fm_weighted_norm(stft_p, args):
     return fm_norm
 
 
-def project_fm_norm(stft_p, args):
+def project_fm_norm(stft_p, args,weights,freqs):
     """
     Scales the STFT of a perturbation so that its FM-weighted norm is ≤ epsilon.
     Input `stft_p` is expected to be in the frequency domain.
     """
-    norm = compute_fm_weighted_norm(stft_p, args)
+    norm = compute_fm_weighted_norm(stft_p=stft_p,args= args,weights=weights,freqs=freqs)
     scale = args.fm_epsilon / norm.clamp(min=1e-8)
     return stft_p * scale

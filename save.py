@@ -106,10 +106,10 @@ def stft_plot(path, tensor, args, sample_rate=16000, title="STFT Magnitude"):
 
 
 def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
-    save_audio(filename=f"{args.save_dir}\perturbation.wav",tensor=p)
-    save_audio(filename=f"{args.save_dir}\perturbation_5x.wav",tensor=p,amplify=5)
-    plot_pert(path=f"{args.save_dir}\perturbation.png",tensor=p)
-    stft_plot(path=f"{args.save_dir}\perturbation_stft.png", tensor=p, args=args)
+    save_audio(filename=os.path.join(args.save_dir, "perturbation.wav"), tensor=p)
+    save_audio(filename=os.path.join(args.save_dir, "perturbation_5x.wav"), tensor=p, amplify=5)
+    plot_pert(path=os.path.join(args.save_dir, "perturbation.png"), tensor=p)
+    stft_plot(path=os.path.join(args.save_dir, "perturbation_stft.png"), tensor=p, args=args)
 
     inspect_random_samples(
         args=args,
@@ -119,14 +119,23 @@ def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
         processor=processor
     )
 
-def save_loss_plot(train_scores, eval_scores, save_dir):
+def save_loss_plot(train_scores, eval_scores, save_dir, norm_type, clean_test_loss=None, perturbed_test_loss=None):
     plt.figure()
 
-    plt.plot(train_scores, label='Train Loss', marker='o')
-    plt.plot(eval_scores, label='Eval Loss', marker='x')
+    x = list(range(len(train_scores)))  # Epoch indices
+
+    plt.plot(x, train_scores, label='Train Loss', marker='o')
+    plt.plot(x, eval_scores, label='Eval Loss', marker='x')
+
+    if clean_test_loss is not None:
+        plt.axhline(y=clean_test_loss, color='green', linestyle='--', label='Clean Test Loss')
+
+    if perturbed_test_loss is not None:
+        plt.axhline(y=perturbed_test_loss, color='red', linestyle='--', label='Perturbed Test Loss')
+
     plt.xlabel("Epoch")
     plt.ylabel("CTC Loss")
-    plt.title("Training and Evaluation Loss")
+    plt.title(f"{norm_type}")
     plt.legend()
     plt.grid(True)
 

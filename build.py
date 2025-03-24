@@ -57,7 +57,7 @@ class SafeLibriSpeech(Dataset):
 
 
 
-def create_data_loaders(args,logger):
+def create_data_loaders(args):
     """
     Create DataLoaders using torchaudio's built-in LIBRISPEECH dataset,
     and batch them with waveform clamping/padding to fixed audio_length.
@@ -76,9 +76,8 @@ def create_data_loaders(args,logger):
     random.shuffle(indices)
     subset_size=999
     if args.small_data:
-        subset_size = 33
-        args.num_items_to_inspect=2
-        logger.info(f"Using small subset of the data: {subset_size} ")
+        subset_size = 23
+        args.num_items_to_inspect=1
         indices = indices[:subset_size]
 
     # === Estimate 75th percentile waveform length ===
@@ -91,7 +90,6 @@ def create_data_loaders(args,logger):
     length_tensor = torch.tensor(sample_lengths)
     quantile = 0.85
     audio_length = int(length_tensor.float().quantile(quantile).item())
-    logger.info(f'{quantile}% audio length {audio_length}')
     # === Create collate_fn using that length ===
     collate_fn = make_collate_fn(audio_length)
 
@@ -107,16 +105,22 @@ def create_data_loaders(args,logger):
     train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_subset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
     test_loader = DataLoader(test_subset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
-    x=(f"training data set size: {len(train_loader)*args.batch_size}\n"
-          f"eval data set size: {len(eval_loader)*args.batch_size}\n"
-          f"test data set size: {len(test_loader)*args.batch_size}\n"
-          f"audio length: {audio_length}")
-    logger.info(x)
+    x=(f"training size: {len(train_loader)*args.batch_size}\t"
+          f"eval size: {len(eval_loader)*args.batch_size}\t"
+          f"test size: {len(test_loader)*args.batch_size}\t"
+          f"audio length: {audio_length}\n")
     print(x)
     return train_loader, eval_loader, test_loader, audio_length
 
 
 
+def get_model_size_gb(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    param_size_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+    buffer_size_bytes = sum(b.numel() * b.element_size() for b in model.buffers())
+
+    total_size_gb = (param_size_bytes + buffer_size_bytes) / (1024 ** 3)
+    return total_size_gb
 
 def load_model(args):
     """
@@ -124,6 +128,7 @@ def load_model(args):
     """
     processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
     model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").to(args.device)
+    print(f"Model size: {get_model_size_gb(model):.2f} GB")
     return model,processor
 
 
@@ -149,7 +154,8 @@ def create_logger(args):
             size= f"{args.snr_db}"
     args.attack_size_string=size
 
-    print(f"norm type: {args.norm_type}, attack size: {args.attack_size_string}")
+    print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}\n")
+
     args.save_dir = os.path.join("logs", args.device, f"{args.norm_type}_{args.attack_size_string}")
     if os.path.exists(args.save_dir):
         shutil.rmtree(args.save_dir)
@@ -219,10 +225,8 @@ def make_fm_spline(args):
     # Normalize (optional)
     weights /= weights.max()
 
-    args.freqs=freqs
-    args.weights=weights
     save.plot_fm_weights(freqs, weights, path=f"{args.save_dir}/fm_weights.png")
-
+    return freqs,weights
 
 def init_perturbation(args,length):
     """
@@ -230,16 +234,18 @@ def init_perturbation(args,length):
     Assumes args.dim = (num_channels, num_samples) or similar.
     """
     p = torch.zeros(1, length, device=args.device).detach().requires_grad_()
-    make_fm_spline(args)
-    #
-    # if args.norm_type in ["fletcher_munson", "leakage","min_max_freqs"]:
-    #     args.time_domain_norm=False
-    # else:
-    #     args.time_domain_norm=True
-    #
-    # if args.norm_type in ['linf', 'l2']:
-    #     p=torch.zeros_like(p)
-    return p
+    freqs,weights=make_fm_spline(args)
+
+    if args.resume_from is not None and os.path.isfile(args.resume_from):
+        print(f"[INFO] Resuming perturbation from: {args.resume_from}")
+        loaded = torch.load(args.resume_from, map_location=args.device)
+        p = loaded.detach().to(args.device).requires_grad_()
+        if p.shape[-1] != length:
+            raise ValueError(f"Loaded perturbation length {p.shape[-1]} does not match expected length {length}")
+    else:
+        p = torch.zeros(1, length, device=args.device).detach().requires_grad_()
+
+    return p, freqs, weights
 
 
 def create_optimizer(args,p):

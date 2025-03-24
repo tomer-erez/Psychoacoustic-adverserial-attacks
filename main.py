@@ -4,16 +4,13 @@ import parser
 import train
 import save
 import torch
+import gc
+import os
 
 
-if __name__ == '__main__':
-    args = parser.create_arg_parser().parse_args()
-    args.device = "cuda" if torch.cuda.is_available() else "cpu"
+def run(args,train_data_loader, eval_data_loader,test_data_loader,audio_length):
     logger=build.create_logger(args=args)
-    logger.info("hello world")
-    train_data_loader, eval_data_loader,test_data_loader,audio_length = build.create_data_loaders(args=args,logger=logger)
-    model,processor = build.load_model(args)
-    p = build.init_perturbation(args,length=audio_length)
+    p,freqs,weights = build.init_perturbation(args,length=audio_length)
     optimizer=build.create_optimizer(args=args,p=p)
     train_scores = []
     eval_scores = []
@@ -25,7 +22,8 @@ if __name__ == '__main__':
         p, train_epoch_score = train.train_epoch(
             args=args, train_data_loader=train_data_loader, p=p,
             model=model,
-            epoch=epoch, logger=logger, processor=processor,optimizer=optimizer
+            epoch=epoch, logger=logger, processor=processor,optimizer=optimizer,
+            weights=weights,freqs=freqs
         )
         train_scores.append(train_epoch_score)
 
@@ -47,7 +45,8 @@ if __name__ == '__main__':
             break
 
         save.save_by_epoch(args=args, p=p, test_data_loader=test_data_loader, model=model,processor= processor,epoch_num=epoch)
-        save.save_loss_plot(train_scores, eval_scores, args.save_dir)
+        save.save_loss_plot(train_scores=train_scores, eval_scores=eval_scores, save_dir=args.save_dir,norm_type=args.norm_type)
+        torch.save(p.detach().cpu(), os.path.join(args.save_dir, f"perturbation_epoch_{epoch}.pt"))
 
     perturbed_test_score = eval_.evaluate( #eval perturbation
         args=args, eval_data_loader=test_data_loader, p=p,
@@ -59,7 +58,11 @@ if __name__ == '__main__':
         model=model, logger=logger,
         perturbed=False, epoch_number=-1, processor=processor
     )
-    x=(f"Summary:\n"
+    save.save_loss_plot(train_scores=train_scores, eval_scores=eval_scores,
+                        save_dir=args.save_dir,norm_type=args.norm_type,
+                        clean_test_loss=clean_test_score,perturbed_test_loss=perturbed_test_score)
+
+    x=(f"\nSummary:\n"
                 f"Perturbation norm type: {args.norm_type}\n"
                 f"Perturbation size: {args.attack_size_string}\n"
                 f"best Train score: {max(train_scores):.3f}\t last train score: {train_scores[-1]:.3f}\n"
@@ -70,3 +73,23 @@ if __name__ == '__main__':
     print(x)
     logger.info(x)
 
+
+
+if __name__ == '__main__':
+    print('hello world')
+    args = parser.create_arg_parser().parse_args()
+    args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f'using device: {args.device}')
+    train_data_loader, eval_data_loader,test_data_loader,audio_length = build.create_data_loaders(args=args)
+    model,processor = build.load_model(args)
+
+    #run the experiment on all pert norms
+    if args.run_all_norms:
+        for x in ["l2","linf","snr","fletcher_munson","leakage","min_max_freqs"]:
+            print(f"\n=== Running norm type: {x} ===\n")
+            args.norm_type=x
+            run(args,train_data_loader, eval_data_loader,test_data_loader,audio_length)
+            torch.cuda.empty_cache()
+            gc.collect()
+    else:
+        run(args,train_data_loader, eval_data_loader,test_data_loader,audio_length)
