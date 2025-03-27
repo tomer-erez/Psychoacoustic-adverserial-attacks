@@ -1,10 +1,11 @@
 import subprocess
 import os
 
+
 os.makedirs('logs', exist_ok=True)
 
 
-def generate_sbatch_job(norm_type, size_value):
+def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None):
     """
     Generate an sbatch job script for a specific norm and size
 
@@ -15,13 +16,12 @@ def generate_sbatch_job(norm_type, size_value):
     Returns:
     str: Filename of the generated sbatch script
     """
+
     # Determine the correct argument based on norm type
     size_args = {
-        "linf": f"--linf_size {size_value}",
-        "l2": f"--l2_size {size_value}",
         "snr": f"--snr_db {int(size_value)}",
-        "fletcher_munson": f"--fm_epsilon {size_value}",
         "min_max_freqs": f"--min_freq_attack {size_value}",
+        "fletcher_munson": f"--fm_epsilon {size_value}",
     }
 
     # Check if norm type is valid
@@ -31,14 +31,23 @@ def generate_sbatch_job(norm_type, size_value):
     # Generate unique filename
     script_filename = f"job_{norm_type}_{size_value}.sh"
 
+    base_args = f"--batch_size 36 --num_epochs 8 --norm_type {norm_type} {size_args[norm_type]}"
+
+
+    safe_target = target_word.replace(" ", "_") if target_word else "none"
+
+
+    if attack_mode == "targeted":
+        base_args += f" --attack_mode targeted --target \"{target_word}\""
+
     # Create the sbatch script
     sbatch_script = f'''#!/bin/bash
 #SBATCH -c 2
 #SBATCH --gres=gpu:A40:1
 #SBATCH --mem=16G
 #SBATCH --time=04:00:00
-#SBATCH --job-name=adv_{norm_type}_{size_value}
-#SBATCH --output=logs/adv_{norm_type}_{size_value}_%j.out
+#SBATCH --job-name=adv_{norm_type}_{size_value}_{safe_target}
+#SBATCH --output=logs/adv_{norm_type}_{size_value}_{safe_target}_%j.out
 #SBATCH --mail-user=tomer.erez@campus.technion.ac.il
 #SBATCH --mail-type=ALL
 
@@ -47,7 +56,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate cs236207
 
 # === Run experiment ===
-python main.py --batch_size 22 --num_epochs 10 --norm_type {norm_type} {size_args[norm_type]}
+python main.py {base_args}
 '''
 
     # Write the script to file
@@ -59,46 +68,56 @@ python main.py --batch_size 22 --num_epochs 10 --norm_type {norm_type} {size_arg
 
 def submit_jobs():
     """
-    Submit sbatch jobs for different norms and their size ranges
+    Submit sbatch jobs iterleaved across norm types
     """
-    # Define norms and their parameter lists
     norm_ranges = {
-        "linf": [0.001, 0.008, 0.01, 0.06],
-        "l2": [0.01, 0.04, 0.09, 0.15],
-        "snr": [19,32,44,57],
-        "fletcher_munson": [2, 4, 8, 12],
-        "min_max_freqs": [100,750,1250,1800],  # Customize if needed
+        "snr": [i for i in range(25,65,10)],
+        "fletcher_munson": [i for i in range(4,44,10)],
+        "min_max_freqs": [i for i in range(200,1250,250)],
     }
 
-    # Track submitted jobs
+
+    target_words = ["delete", "delete file"]  # Sweep over these
+    attack_mode = "targeted"  # or "untargeted"
+
+    # Find the max number of sizes among all norms
+    max_len = max(len(sizes) for sizes in norm_ranges.values())
+    norm_types = list(norm_ranges.keys())
+
     submitted_jobs = []
 
-    # Loop through norms and their ranges
-    for norm_type, size_range in norm_ranges.items():
-        for size_value in size_range:
-            try:
-                # Generate sbatch script
-                script_filename = generate_sbatch_job(norm_type, size_value)
+    for target in target_words if attack_mode == "targeted" else [None]:
+        for i in range(max_len):
+            for norm_type in norm_types:
+                size_list = norm_ranges[norm_type]
+                if i < len(size_list):
+                    size_value = size_list[i]
+                    try:
+                        # Generate sbatch script with optional target word
+                        script_filename = generate_sbatch_job(
+                            norm_type, size_value,
+                            attack_mode=attack_mode,
+                            target_word=target
+                        )
 
-                # Submit the job
-                result = subprocess.run(['sbatch', script_filename],
-                                        capture_output=True,
-                                        text=True)
+                        # Submit
+                        result = subprocess.run(['sbatch', script_filename],
+                                                capture_output=True,
+                                                text=True)
 
-                # Print job submission result
-                print(f"Submitted job for {norm_type} with size {size_value}")
-                print(result.stdout.strip())
+                        print(f"Submitted job for {norm_type}, size {size_value}, target {target}")
+                        print(result.stdout.strip())
 
-                # Optional: Store submitted job information
-                submitted_jobs.append({
-                    'norm_type': norm_type,
-                    'size_value': size_value,
-                    'script': script_filename,
-                    'job_id': result.stdout.strip().split()[-1]
-                })
+                        submitted_jobs.append({
+                            'norm_type': norm_type,
+                            'size_value': size_value,
+                            'target_word': target,
+                            'script': script_filename,
+                            'job_id': result.stdout.strip().split()[-1]
+                        })
 
-            except Exception as e:
-                print(f"Error submitting job for {norm_type} with size {size_value}: {e}")
+                    except Exception as e:
+                        print(f"Error submitting job for {norm_type} with size {size_value}: {e}")
 
     return submitted_jobs
 

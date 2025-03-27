@@ -1,10 +1,11 @@
 import torch
 from core import fourier_transforms, projections
 import time
+
 def avg_scores(scores):
     return sum(scores) / len(scores)
 
-def perturbation_constraint(p,clean_audio, args,weights,freqs):
+def perturbation_constraint(p,clean_audio, args,weights):
     """
     Projects the perturbation to the allowed constraint set.
     Assumes input is a Tensor (not a Parameter).
@@ -23,7 +24,7 @@ def perturbation_constraint(p,clean_audio, args,weights,freqs):
                                                   min_freq=args.min_freq_attack,
                                                   max_freq=args.max_freq_attack)
         elif args.norm_type == "fletcher_munson":
-            p= projections.project_fm_norm(stft_p=p,args=args,weights=weights,freqs=freqs)
+            p = projections.project_fm_norm(stft_p=p, args=args, weights_matrix=weights)
 
         p= fourier_transforms.compute_istft(p, args=args)
 
@@ -48,6 +49,9 @@ def perturbation_constraint(p,clean_audio, args,weights,freqs):
 
 
 def get_loss_for_training(model, data, target_texts, processor, args):
+    if args.attack_mode == "targeted":
+        target_texts = [args.target] * len(data)
+
     labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(args.device)
     labels[labels == processor.tokenizer.pad_token_id] = -100
     outputs = model(input_values=data, labels=labels)
@@ -55,7 +59,7 @@ def get_loss_for_training(model, data, target_texts, processor, args):
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optimizer,weights,freqs):
+def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optimizer,weights):
     scores = []
     times= []
     model.eval()
@@ -71,17 +75,15 @@ def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optim
         if args.optimize_type == "pgd":
             (loss).backward()  # <-- YES, when doing gradient ascent
             with torch.no_grad():
-                p = p + args.lr * p.grad.sign()  # gradient ascent
-                p = perturbation_constraint(p=p, clean_audio=data, args=args,weights=weights,freqs=freqs)
-            p = p.detach().requires_grad_()  # reset for next step
+                if args.attack_mode=="targeted":
+                    p = p - args.lr * p.grad.sign()  # gradient descent
+                else:
+                    p = p + args.lr * p.grad.sign()  # gradient ascent
 
-        elif args.optimize_type == "adam":
-            optimizer.zero_grad()
-            (loss).backward()  # <-- YES, when doing gradient ascent
-            optimizer.step()  # this updates `p` in-place
-            with torch.no_grad():
-                p = perturbation_constraint(p=p, clean_audio=data, args=args,weights=weights,freqs=freqs)
-            p = p.detach().requires_grad_()
+                p = perturbation_constraint(p=p, clean_audio=data, args=args,weights=weights)
+            p = p.detach().requires_grad_()  # reset for next step
+        else:
+            raise NotImplementedError("not implemented other optimization types")
         b=time.time()
         times.append(b-a)
 

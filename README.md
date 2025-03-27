@@ -3,9 +3,11 @@
 
 universal untargeted adverserial attacks on speech recognition models, 
 
-
 focused on perturbations with low imperceptibility likelihood by the human ear.
 
+studying how different perturbation norms/sizes can 
+
+confuse the model, with the goal of finding attacks that can be hidden from the human ear.
 
 # requirements:
 
@@ -18,3 +20,16 @@ run with downloading the dataset (omit the flag else)
 ```
 python main.py --download_ds
 ```
+
+# dataset:
+
+you can either download it in script via the flag or get it from: https://www.openslr.org/12
+
+
+
+# hyper params:
+
+play around with the size of the attacks via the cli arguments, also specify the norm type
+
+
+

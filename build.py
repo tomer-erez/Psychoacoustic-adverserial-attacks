@@ -10,7 +10,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchaudio.datasets import LIBRISPEECH  # Example ASR dataset
 import numpy as np
 import scipy.interpolate
-import save
+from datetime import datetime
+
 
 def make_collate_fn(audio_length):
     def collate_fn(batch):
@@ -76,7 +77,7 @@ def create_data_loaders(args):
     random.shuffle(indices)
     subset_size=999
     if args.small_data:
-        subset_size = 23
+        subset_size = 20
         args.num_items_to_inspect=1
         indices = indices[:subset_size]
 
@@ -140,26 +141,34 @@ def create_logger(args):
     size=''
     if args.norm_type in ["fletcher_munson", "leakage","min_max_freqs"]:
         if args.norm_type == "leakage":
-            size = f'{args.min_freq_leakage}_{args.max_freq_leakage}'
+            size = f'{args.min_freq_leakage}'
         elif args.norm_type == "min_max_freqs":
-            size = f'{args.min_freq_attack}_{args.max_freq_attack}'
+            size = f'{args.min_freq_attack}'
         elif args.norm_type == "fletcher_munson":
             size=f'{args.fm_epsilon}'
     else:
         if args.norm_type == "l2":
             size= f"{args.l2_size}"
         elif args.norm_type=="linf":
-            size= f"+-{args.linf_size}"
+            size= f"{args.linf_size}"
         elif args.norm_type=="snr":
             size= f"{args.snr_db}"
     args.attack_size_string=size
 
-    print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}\n")
 
-    args.save_dir = os.path.join("logs", args.device, f"{args.norm_type}_{args.attack_size_string}")
+    print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}")
+
+    timestamp = datetime.now().strftime('%Y*%m*%d*%H*%M*%S')
+
+    if args.small_data:
+        args.save_dir = os.path.join("logs", "small_data", f"{args.norm_type}_{args.attack_size_string}")
+    else:
+        args.save_dir = os.path.join("logs", args.device, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}_{timestamp}")
+
     if os.path.exists(args.save_dir):
         shutil.rmtree(args.save_dir)
     os.makedirs(args.save_dir, exist_ok=True)
+    print(f"going to save to: {args.save_dir}\n")
 
     args.log_file = os.path.join(args.save_dir, 'train_log.txt')
 
@@ -191,6 +200,7 @@ def create_logger(args):
 def make_fm_spline(args):
     """
     Returns interpolated Fletcher-Munson weights for the STFT frequency bins.
+    this is an approximation at about 60DB, needs to be improved to fully capture the amplitude-frequency sensitivity relationship
     """
     # ISO 226 frequency sensitivity data (normalized)
     ISO226_FREQS = np.array([
@@ -225,7 +235,7 @@ def make_fm_spline(args):
     # Normalize (optional)
     weights /= weights.max()
 
-    save.plot_fm_weights(freqs, weights, path=f"{args.save_dir}/fm_weights.png")
+    # save.plot_fm_weights(freqs, weights, path=f"{args.save_dir}/fm_weights.png")
     return freqs,weights
 
 def init_perturbation(args,length):
@@ -233,7 +243,6 @@ def init_perturbation(args,length):
     Initializes a universal perturbation `p` with the same shape as input audio.
     Assumes args.dim = (num_channels, num_samples) or similar.
     """
-    p = torch.zeros(1, length, device=args.device).detach().requires_grad_()
     freqs,weights=make_fm_spline(args)
 
     if args.resume_from is not None and os.path.isfile(args.resume_from):

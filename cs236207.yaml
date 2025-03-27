@@ -1,4 +1,4 @@
-name: cs236207
+name: cs236207111
 channels:
   - pytorch
   - nvidia

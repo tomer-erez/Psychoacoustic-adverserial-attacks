@@ -15,6 +15,9 @@ def get_logits(batch_waveforms,processor,args,model):
 
 
 def get_loss(batch_waveforms, target_texts, processor, args, model):
+    if args.attack_mode == "targeted":
+        target_texts = [args.target] * len(batch_waveforms)
+
     input_values = batch_waveforms.to(args.device)
     labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(args.device)
     labels[labels == processor.tokenizer.pad_token_id] = -100

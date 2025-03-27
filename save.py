@@ -72,14 +72,17 @@ def inspect_random_samples(args, test_data_loader, p, model, processor):
         save_audio(os.path.join(sample_dir, "perturbed.wav"), perturbed)
 
         # Save plots
-        plot_pert(os.path.join(sample_dir, "clean.png"), clean)
-        plot_pert(os.path.join(sample_dir, "perturbed.png"), perturbed)
+        # plot_pert(os.path.join(sample_dir, "clean.png"), clean)
+        # plot_pert(os.path.join(sample_dir, "perturbed.png"), perturbed)
 
         # Save transcription
-        with open(os.path.join(sample_dir, "transcription.txt"), "w") as f:
-            f.write(f"Ground Truth:   {ground_truth}\n")
-            f.write(f"Clean Pred:     {clean_pred}\n")
-            f.write(f"Perturbed Pred: {pert_pred}\n")
+        if clean_pred != pert_pred:
+            name_tr="sus_transcription.txt"
+        else:
+            name_tr="transcription.txt"
+        with open(os.path.join(sample_dir, name_tr), "w") as f:
+            f.write(f"Clean Pred:     {clean_pred}\n\n")
+            f.write(f"Perturbed Pred: {pert_pred}\n\n")
 
 def stft_plot(path, tensor, args, sample_rate=16000, title="STFT Magnitude"):
     stft = fourier_transforms.compute_stft(tensor.squeeze(0), args)
@@ -119,13 +122,14 @@ def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
         processor=processor
     )
 
-def save_loss_plot(train_scores, eval_scores, save_dir, norm_type, clean_test_loss=None, perturbed_test_loss=None):
-    plt.figure()
+def save_loss_plot(train_scores, eval_scores_perturbed, eval_scores_clean, save_dir, norm_type, clean_test_loss=None, perturbed_test_loss=None):
+    plt.figure(figsize=(10, 6))
 
     x = list(range(len(train_scores)))  # Epoch indices
 
     plt.plot(x, train_scores, label='Train Loss', marker='o')
-    plt.plot(x, eval_scores, label='Eval Loss', marker='x')
+    plt.plot(x, eval_scores_clean, label='Eval Loss (Clean)', marker='^')
+    plt.plot(x, eval_scores_perturbed, label='Eval Loss (Perturbed)', marker='x')
 
     if clean_test_loss is not None:
         plt.axhline(y=clean_test_loss, color='green', linestyle='--', label='Clean Test Loss')
@@ -135,13 +139,15 @@ def save_loss_plot(train_scores, eval_scores, save_dir, norm_type, clean_test_lo
 
     plt.xlabel("Epoch")
     plt.ylabel("CTC Loss")
-    plt.title(f"{norm_type}")
+    plt.title(f"Loss Curve — Norm Type: {norm_type}")
     plt.legend()
     plt.grid(True)
 
+    os.makedirs(save_dir, exist_ok=True)
     plot_path = os.path.join(save_dir, "loss_plot.png")
     plt.savefig(plot_path)
     plt.close()
+
 
 def plot_fm_weights(freqs, weights, path="fm_weights.png"):
     """
@@ -159,3 +165,52 @@ def plot_fm_weights(freqs, weights, path="fm_weights.png"):
     plt.tight_layout()
     plt.savefig(path)
     plt.close()
+
+
+
+import json
+import os
+
+def save_json_results(save_dir,
+                      norm_type,
+                      attack_size,
+                      epoch=None,
+                      train_score=None,
+                      eval_score_clean=None,
+                      eval_score_perturbed=None,
+                      best_train_score=None,
+                      best_eval_score=None,
+                      final_test_clean=None,
+                      final_test_perturbed=None):
+    """
+    Saves all relevant results to a JSON file (overwrites each call).
+    """
+    json_path = os.path.join(save_dir, "results.json")
+
+    results = {
+        "norm_type": norm_type,
+        "attack_size": float(attack_size),
+    }
+
+    if epoch is not None:
+        results["epoch"] = epoch
+    if train_score is not None:
+        results["train_score"] = train_score
+    if eval_score_clean is not None:
+        results["eval_score_clean"] = eval_score_clean
+    if eval_score_perturbed is not None:
+        results["eval_score_perturbed"] = eval_score_perturbed
+    if best_train_score is not None:
+        results["best_train_score"] = best_train_score
+    if best_eval_score is not None:
+        results["best_eval_score"] = best_eval_score
+    if final_test_clean is not None:
+        results["test_loss_clean"] = final_test_clean
+    if final_test_perturbed is not None:
+        results["test_loss_perturbed"] = final_test_perturbed
+        if final_test_clean:
+            results["perturbation_efficiency"] = final_test_perturbed / final_test_clean
+
+    with open(json_path, "w") as f:
+        json.dump(results, f, indent=2)
+
