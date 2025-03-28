@@ -50,7 +50,9 @@ def perturbation_constraint(p,clean_audio, args,weights):
 
 def get_loss_for_training(model, data, target_texts, processor, args):
     if args.attack_mode == "targeted":
-        target_texts = [args.target] * len(data)
+        repeated_target = " ".join([args.target] * args.target_reps)
+        target_texts = [repeated_target] * len(data)
+
 
     labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(args.device)
     labels[labels == processor.tokenizer.pad_token_id] = -100

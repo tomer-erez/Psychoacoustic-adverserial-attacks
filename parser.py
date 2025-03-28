@@ -4,7 +4,7 @@ def create_arg_parser():
     parser = argparse.ArgumentParser()
 
     """standard training params"""
-    parser.add_argument('--batch_size', type=int,default=6,help='batch size')
+    parser.add_argument('--batch_size', type=int,default=10,help='batch size')
     parser.add_argument('--lr', type=float,default=4e-4,help='lr for the perturbation update')
     parser.add_argument('--early_stopping', type=int,default=3,help='how many epochs to wait before early stopping')
     parser.add_argument('--num_epochs', type=int,default=2,help='how many epochs at all')
@@ -16,13 +16,15 @@ def create_arg_parser():
 
 
     """adverserial training specific params"""
-
+    parser.add_argument('--target_reps', type=int,default=10,
+                        help='how many times should the model predict the target word, for example if 1: <delete>, if 5: <delete delete delete delete delete> as the label to optimize')
     parser.add_argument('--target', type=str,
-                        default="kill",help='Target phrase for targeted attacks')
-
+                        default="delete",help='Target phrase for targeted attacks')
     parser.add_argument('--attack_mode', type=str,
                         choices=["untargeted", "targeted"],
                         default="untargeted",help='if set, we train a perturbation to increase the likeleyhood of predicting this word')
+
+
 
     parser.add_argument('--norm_type', type=str,
                         choices=["l2","linf","snr",

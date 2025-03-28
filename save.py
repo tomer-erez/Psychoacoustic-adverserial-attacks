@@ -43,7 +43,7 @@ def plot_pert(path, tensor, sample_rate=16000, title="Perturbation waveform"):
 
 
 
-def inspect_random_samples(args, test_data_loader, p, model, processor):
+def inspect_random_samples(args, test_data_loader, p, model, processor,epoch):
     model.eval()
     # Collect all test data into a list (only needed once)
     all_samples = list(test_data_loader)
@@ -75,11 +75,15 @@ def inspect_random_samples(args, test_data_loader, p, model, processor):
         # plot_pert(os.path.join(sample_dir, "clean.png"), clean)
         # plot_pert(os.path.join(sample_dir, "perturbed.png"), perturbed)
 
-        # Save transcription
-        if clean_pred != pert_pred:
-            name_tr="sus_transcription.txt"
+        name_tr = "transcription.txt"
+
+        if args.attack_mode=="targeted":
+            if args.target in pert_pred:
+                name_tr=f"target_in_transcription_epoch_{epoch}.txt"
         else:
-            name_tr="transcription.txt"
+            if clean_pred != pert_pred:
+                name_tr=f"sus_transcription_epoch_{epoch}.txt"
+
         with open(os.path.join(sample_dir, name_tr), "w") as f:
             f.write(f"Clean Pred:     {clean_pred}\n\n")
             f.write(f"Perturbed Pred: {pert_pred}\n\n")
@@ -119,7 +123,8 @@ def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
         test_data_loader=test_data_loader,
         p=p,
         model=model,
-        processor=processor
+        processor=processor,
+        epoch=epoch_num
     )
 
 def save_loss_plot(train_scores, eval_scores_perturbed, eval_scores_clean, save_dir, norm_type, clean_test_loss=None, perturbed_test_loss=None):

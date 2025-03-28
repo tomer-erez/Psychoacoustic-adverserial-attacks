@@ -1,7 +1,6 @@
 # Psychoacoustically-Informed-Adversarial-Attacks-on-Speech-Recognition-Systems
 
-
-universal untargeted adverserial attacks on speech recognition models, 
+universal un-targeted adverserial attacks on speech recognition models, 
 
 focused on perturbations with low imperceptibility likelihood by the human ear.
 
@@ -11,7 +10,7 @@ confuse the model, with the goal of finding attacks that can be hidden from the 
 
 # requirements:
 
-i used the conda env installation file attached.
+use the conda env installation file attached.
 
 ``conda env create -f cs236207.yaml``
 

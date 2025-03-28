@@ -71,13 +71,13 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [i for i in range(25,65,10)],
-        "fletcher_munson": [i for i in range(4,44,10)],
-        "min_max_freqs": [i for i in range(200,1250,250)],
+        "snr": [2,8,18,32],
+        "fletcher_munson": [9,15,25,50],
+        "min_max_freqs": [500,1500,3500,8000],
     }
 
 
-    target_words = ["delete", "delete file"]  # Sweep over these
+    target_words = ["delete"]  # Sweep over these
     attack_mode = "targeted"  # or "untargeted"
 
     # Find the max number of sizes among all norms

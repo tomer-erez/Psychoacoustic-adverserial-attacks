@@ -158,12 +158,12 @@ def create_logger(args):
 
     print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}")
 
-    timestamp = datetime.now().strftime('%Y*%m*%d*%H*%M*%S')
+    # timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
     if args.small_data:
         args.save_dir = os.path.join("logs", "small_data", f"{args.norm_type}_{args.attack_size_string}")
     else:
-        args.save_dir = os.path.join("logs", args.device, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}_{timestamp}")
+        args.save_dir = os.path.join("logs", args.device, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
 
     if os.path.exists(args.save_dir):
         shutil.rmtree(args.save_dir)
