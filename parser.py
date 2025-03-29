@@ -23,6 +23,9 @@ def create_arg_parser():
     parser.add_argument('--attack_mode', type=str,
                         choices=["untargeted", "targeted"],
                         default="untargeted",help='if set, we train a perturbation to increase the likeleyhood of predicting this word')
+    parser.add_argument('--loss_fn', type=str,
+                        choices=["ctc", "wer"],
+                        default="ctc",help='loss function to optimize the perturbation')
 
 
 
