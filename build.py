@@ -45,7 +45,12 @@ class SafeDatasetWrapper(Dataset):
         valid = []
         for i in range(len(self.base_dataset)):
             try:
-                _ = self[i]  # trigger __getitem__ to make sure parsing works
+                raw = self.base_dataset[i]  # avoid calling self[i]!
+                # Validate structure
+                if self.dataset_type == "LibreeSpeech":
+                    waveform, sample_rate, transcript, *_ = raw
+                elif self.dataset_type == "CommonVoice":
+                    waveform, sample_rate, transcript = raw["audio"][0], raw["audio"][1], raw["sentence"]
                 valid.append(i)
             except Exception as e:
                 print(f"[WARN] Skipping invalid file at index {i}: {e}")
@@ -86,10 +91,8 @@ def create_data_loaders(args):
 
     elif args.dataset == "CommonVoice":
         base_dataset = COMMONVOICE(
-            root="C:/Users/tomer.erez/Downloads/cv-corpus-21.0-delta-2025-03-14-en/cv-corpus-21.0-delta-2025-03-14",
-            tsv="en/validated.tsv",
-            audio_folder="en/clips",
-            download=False
+            root=args.CommonVoice_path,
+            tsv="validated.tsv"
         )
 
     else:
@@ -106,7 +109,7 @@ def create_data_loaders(args):
         args.num_items_to_inspect=1
         indices = indices[:subset_size]
 
-    # === Estimate 75th percentile waveform length ===
+    # === Estimate x percentile waveform length ===
     sample_indices = indices[:min(200,subset_size)]  # Sample 200 examples for efficiency
     sample_lengths = []
     for idx in sample_indices:
@@ -114,7 +117,7 @@ def create_data_loaders(args):
         sample_lengths.append(waveform.shape[1])  # [1, T]
 
     length_tensor = torch.tensor(sample_lengths)
-    quantile = 0.85
+    quantile = 0.60
     audio_length = int(length_tensor.float().quantile(quantile).item())
     # === Create collate_fn using that length ===
     collate_fn = make_collate_fn(audio_length)

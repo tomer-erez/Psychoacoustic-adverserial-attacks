@@ -1,4 +1,6 @@
 import argparse
+import os.path
+
 
 def create_arg_parser():
     parser = argparse.ArgumentParser()
@@ -16,7 +18,7 @@ def create_arg_parser():
     parser.add_argument('--dataset', type=str,default="LibreeSpeech",
                         choices=["LibreeSpeech","CommonVoice"])
 
-    parser.add_argument('--CommonVoice_path', type=str,default="cv-corpus-21.0-delta-2025-03-14-en")
+    parser.add_argument('--CommonVoice_path', type=str,default=os.path.join("CommonVoice","cv-corpus-21.0-delta-2025-03-14","en"))
     parser.add_argument('--LibriSpeech_path', type=str,default="train-clean-100",)
 
     parser.add_argument('--dataset_path', type=str,
