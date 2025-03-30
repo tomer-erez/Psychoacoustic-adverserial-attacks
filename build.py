@@ -7,7 +7,7 @@ import json
 import random
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from torch.utils.data import Dataset, DataLoader
-from torchaudio.datasets import LIBRISPEECH  # Example ASR dataset
+from torchaudio.datasets import LIBRISPEECH,COMMONVOICE  # Example ASR dataset
 import numpy as np
 import scipy.interpolate
 from datetime import datetime
@@ -35,23 +35,33 @@ def make_collate_fn(audio_length):
 
     return collate_fn
 
-class SafeLibriSpeech(Dataset):
-    def __init__(self, base_dataset):
+class SafeDatasetWrapper(Dataset):
+    def __init__(self, base_dataset, dataset_type="LibreeSpeech"):
         self.base_dataset = base_dataset
+        self.dataset_type = dataset_type
         self.valid_indices = self._find_valid_indices()
 
     def _find_valid_indices(self):
         valid = []
         for i in range(len(self.base_dataset)):
             try:
-                _ = self.base_dataset[i]
+                _ = self[i]  # trigger __getitem__ to make sure parsing works
                 valid.append(i)
             except Exception as e:
                 print(f"[WARN] Skipping invalid file at index {i}: {e}")
         return valid
 
     def __getitem__(self, index):
-        return self.base_dataset[self.valid_indices[index]]
+        raw = self.base_dataset[self.valid_indices[index]]
+
+        if self.dataset_type == "LibreeSpeech":
+            waveform, sample_rate, transcript, *_ = raw
+        elif self.dataset_type == "CommonVoice":
+            waveform, sample_rate, transcript = raw["audio"][0], raw["audio"][1], raw["sentence"]
+        else:
+            raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
+
+        return waveform, sample_rate, transcript
 
     def __len__(self):
         return len(self.valid_indices)
@@ -66,13 +76,26 @@ def create_data_loaders(args):
 
 
     """change the dataset?"""
-    base_dataset = LIBRISPEECH(
-        root=args.dataset_path,
-        url="train-clean-100",
-        folder_in_archive="LibriSpeech",
-        download=args.download_ds
-    )
-    dataset = SafeLibriSpeech(base_dataset)
+    if args.dataset == "LibreeSpeech":
+        base_dataset = LIBRISPEECH(
+            root=args.LibriSpeech_path,
+            url="train-clean-100",
+            folder_in_archive="LibriSpeech",
+            download=args.download_ds
+        )
+
+    elif args.dataset == "CommonVoice":
+        base_dataset = COMMONVOICE(
+            root="C:/Users/tomer.erez/Downloads/cv-corpus-21.0-delta-2025-03-14-en/cv-corpus-21.0-delta-2025-03-14",
+            tsv="en/validated.tsv",
+            audio_folder="en/clips",
+            download=False
+        )
+
+    else:
+        raise ValueError(f"Unsupported dataset: {args.dataset}")
+
+    dataset = SafeDatasetWrapper(base_dataset, dataset_type=args.dataset)
 
     random.seed(args.seed)
     indices = list(range(len(dataset)))

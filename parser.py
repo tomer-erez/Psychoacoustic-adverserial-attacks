@@ -13,7 +13,16 @@ def create_arg_parser():
                         default='pgd',help='how to optimize the perturbation update')
     parser.add_argument('--download_ds', action='store_true',
                         help='If set, download the whole dataset and cache it')
+    parser.add_argument('--dataset', type=str,default="LibreeSpeech",
+                        choices=["LibreeSpeech","CommonVoice"])
 
+    parser.add_argument('--CommonVoice_path', type=str,default="cv-corpus-21.0-delta-2025-03-14-en")
+    parser.add_argument('--LibriSpeech_path', type=str,default="train-clean-100",)
+
+    parser.add_argument('--dataset_path', type=str,
+                        default='./train-clean-100',help="path to the dataset")
+    parser.add_argument('--resume_from', type=str, default=None,
+                        help='Path to a saved perturbation .pt file to resume training from')
 
     """adverserial training specific params"""
     parser.add_argument('--target_reps', type=int,default=10,
@@ -26,7 +35,6 @@ def create_arg_parser():
     parser.add_argument('--loss_fn', type=str,
                         choices=["ctc", "wer"],
                         default="ctc",help='loss function to optimize the perturbation')
-
 
 
     parser.add_argument('--norm_type', type=str,
@@ -43,12 +51,6 @@ def create_arg_parser():
     parser.add_argument('--min_freq_leakage', type=int,default=20,help='min freq to attack in leakage meaning the humans exact frequency boundaries, remember that the human threshold is ~20 hz')
     parser.add_argument('--max_freq_leakage', type=int,default=2e4,help='max freq to attack in leakage meaning the humans exact frequency boundaries, remember that the human threshold is ~20000 hz')
 
-
-    """paths"""
-    parser.add_argument('--dataset_path', type=str,
-                        default='./train-clean-100',help="path to the dataset")
-    parser.add_argument('--resume_from', type=str, default=None,
-                        help='Path to a saved perturbation .pt file to resume training from')
 
     """sound properties"""
     parser.add_argument('--sr', type=int,default=16000,help='sample rate')

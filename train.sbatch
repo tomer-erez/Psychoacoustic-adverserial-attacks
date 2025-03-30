@@ -13,4 +13,4 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate cs236207
 
 # === Run experiment ===
-python main.py --batch_size 38 --num_epochs 35 --norm_type min_max_freqs --min_freq_attack 367
+python main.py --batch_size 12 --num_epochs 10 --norm_type fletcher_munson --fm_epsilon 9.1

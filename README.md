@@ -22,7 +22,17 @@ python main.py --download_ds
 
 # dataset:
 
-you can either download it in script via the flag or get it from: https://www.openslr.org/12
+
+Common voice: you can either download it in script via the flag or get it from:
+
+https://commonvoice.mozilla.org/en/datasets
+
+or the libreespeech (preferably not because wav2vec2 is trained on it, hence the perturbation needs to train on something else)
+
+https://www.openslr.org/12
+
+
+
 
 
 

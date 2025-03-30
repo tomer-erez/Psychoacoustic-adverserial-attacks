@@ -6,7 +6,7 @@ import parser
 import build
 import eval as eval_
 import train
-
+import time
 if __name__ == '__main__':
     args = parser.create_arg_parser().parse_args()
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -65,9 +65,10 @@ if __name__ == '__main__':
         else:
             no_improve_epochs=no_improve_epochs+1
 
-        # if no_improve_epochs>args.early_stopping:#early stopping
-        #     logger.info(f'no improvements in {no_improve_epochs} epochs, stopping training and testing on the test set')
-        #     break
+        if no_improve_epochs>args.early_stopping:#early stopping
+            logger.info(f'no improvements in {no_improve_epochs} epochs, stopping training and testing on the test set')
+            time.sleep(5)
+            break
         save.save_by_epoch(args=args, p=p, test_data_loader=test_data_loader, model=model, processor= processor, epoch_num=epoch)
         save.save_loss_plot(train_scores=train_scores, eval_scores_perturbed=eval_scores_perturbed, eval_scores_clean=eval_scores_clean, save_dir=args.save_dir, norm_type=args.norm_type)
 

@@ -22,6 +22,8 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
         "snr": f"--snr_db {int(size_value)}",
         "min_max_freqs": f"--min_freq_attack {size_value}",
         "fletcher_munson": f"--fm_epsilon {size_value}",
+        "l2": f"--l2_size {size_value}",
+        "linf": f"--linf_size {size_value}",
     }
 
     # Check if norm type is valid
@@ -31,7 +33,7 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
     # Generate unique filename
     script_filename = f"job_{norm_type}_{size_value}.sh"
 
-    base_args = f"--batch_size 36 --num_epochs 10 --norm_type {norm_type} {size_args[norm_type]}"
+    base_args = f"--batch_size 38 --num_epochs 15 --norm_type {norm_type} {size_args[norm_type]}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -71,14 +73,16 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [4,10,20,30],
-        "fletcher_munson": [9,20,50],
-        "min_max_freqs": [1200,4000,15000],
+        "snr": [47],
+        "min_max_freqs": [225],
+        "fletcher_munson": [8.9],
+        "l2": [0.1],
+        "linf": [0.0003],
     }
 
 
     target_words = ["delete"]  # Sweep over these
-    attack_mode = "targeted"  # or "untargeted"
+    attack_mode = "untargeted"  # or "untargeted"
 
     # Find the max number of sizes among all norms
     max_len = max(len(sizes) for sizes in norm_ranges.values())
