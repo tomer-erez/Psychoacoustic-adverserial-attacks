@@ -1,6 +1,7 @@
 import torch
 
 
+
 # === 5. Helper functions
 def get_logits(batch_waveforms,processor,args,model):
     inputs = processor(
@@ -31,7 +32,7 @@ def decode(logits,processor):
     pred_ids = torch.argmax(logits, dim=-1)
     return processor.batch_decode(pred_ids)
 
-def evaluate(args, eval_data_loader, p, model, processor, logger, perturbed=False, epoch_number=-1):
+def evaluate(args, eval_data_loader, p, model, processor, perturbed=False, epoch_number=-1):
     model.eval()
     scores = []
 
@@ -39,8 +40,7 @@ def evaluate(args, eval_data_loader, p, model, processor, logger, perturbed=Fals
         for batch_idx, (data, target_texts) in enumerate(eval_data_loader):
             data = data.to(args.device)
             data.requires_grad = False
-            # if p.shape[-1]!=data.shape[-1]:
-            #     raise ValueError(f"data shape {data.shape} does not match p shape {p.shape}")
+
             if perturbed:
                 data = data + p
 
@@ -54,20 +54,8 @@ def evaluate(args, eval_data_loader, p, model, processor, logger, perturbed=Fals
 
             scores.append(loss.item())
 
-            # # === Print predictions for first batch only
-            # if epoch_number==-1 and batch_idx == 0:
-            #     predictions = decode(logits, processor)
-            #     for pred, gt in zip(predictions, target_texts):
-            #         logger.info(f"→ Predicted: {pred}\n  Ground truth: {gt}\n")
-
 
     avg_score = sum(scores) / len(scores) if scores else float('inf')
 
-    if epoch_number == -1:
-        msg = f"[TEST set - {'PERTURBED' if perturbed else 'CLEAN'}] Avg CTC Loss: {avg_score:.4f}\n"
-    else:
-        msg = f"[EVAL set - Epoch {epoch_number}] Avg CTC Loss: {avg_score:.4f}\n"
-
-    logger.info(msg)
     return avg_score
 

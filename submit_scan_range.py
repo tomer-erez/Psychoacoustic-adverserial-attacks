@@ -1,13 +1,13 @@
 import subprocess
 import os
 
-
-os.makedirs('logs', exist_ok=True)
+logs_dir='/home/tomer.erez/psychoacoustic_attacks/logs'
+os.makedirs(logs_dir, exist_ok=True)
 
 
 def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None):
     """
-    Generate an sbatch job script for a specific norm and size
+    Generate a sbatch job script for a specific norm and size
 
     Args:
     norm_type (str): Type of norm to use
@@ -29,11 +29,13 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
     # Check if norm type is valid
     if norm_type not in size_args:
         raise ValueError(f"Unsupported norm type: {norm_type}")
-
+    if size_value is None:
+        return
+    name_to_use = f"{norm_type}_{size_value}_{attack_mode}"
     # Generate unique filename
-    script_filename = f"job_{norm_type}_{size_value}.sh"
+    script_filename = f"{name_to_use}.sh"
 
-    base_args = f"--batch_size 38 --num_epochs 15 --norm_type {norm_type} {size_args[norm_type]}"
+    base_args = f"--batch_size 64 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -47,9 +49,8 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
 #SBATCH -c 2
 #SBATCH --gres=gpu:A40:1
 #SBATCH --mem=16G
-#SBATCH --time=04:00:00
-#SBATCH --job-name=adv_{norm_type}_{size_value}_{safe_target}
-#SBATCH --output=logs/adv_{norm_type}_{size_value}_{safe_target}_%j.out
+#SBATCH --job-name={name_to_use}
+#SBATCH --output={logs_dir}/{name_to_use}_%j.out
 #SBATCH --mail-user=tomer.erez@campus.technion.ac.il
 #SBATCH --mail-type=ALL
 
@@ -73,16 +74,16 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [47],
-        "min_max_freqs": [225],
-        "fletcher_munson": [8.9],
-        "l2": [0.1],
-        "linf": [0.0003],
+        "snr": [50],
+        "min_max_freqs": [350],
+        "fletcher_munson": [5],
+        "l2": [],
+        "linf": [],
     }
 
 
     target_words = ["delete"]  # Sweep over these
-    attack_mode = "untargeted"  # or "untargeted"
+    attack_mode = "targeted"  # "untargeted" or "targeted"
 
     # Find the max number of sizes among all norms
     max_len = max(len(sizes) for sizes in norm_ranges.values())

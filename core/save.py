@@ -1,14 +1,14 @@
 import torch
 import torchaudio
 import matplotlib.pyplot as plt
-import eval as eval_
-from core import fourier_transforms
-import os
+from core import fourier_transforms,evaluation
 import random
+import shutil
+
 
 def save_audio(filename, tensor, sample_rate=16000, amplify=1.0):
     tensor = tensor.detach().cpu()
-    # Optional amplification (e.g. for perturbation)
+    # Optional amplification (e.g. if you want to play it and the original perturbation is completely un-detectable)
     tensor = tensor * amplify
     # Clamp to [-1.0, 1.0]
     tensor = torch.clamp(tensor, -1.0, 1.0)
@@ -43,9 +43,8 @@ def plot_pert(path, tensor, sample_rate=16000, title="Perturbation waveform"):
 
 
 
-def inspect_random_samples(args, test_data_loader, p, model, processor,epoch):
+def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
     model.eval()
-    # Collect all test data into a list (only needed once)
     all_samples = list(test_data_loader)
     chosen_samples = random.sample(all_samples, args.num_items_to_inspect)
 
@@ -54,39 +53,48 @@ def inspect_random_samples(args, test_data_loader, p, model, processor,epoch):
         clean = audio.clone().unsqueeze(0)
         perturbed = (audio + p.squeeze(0)).unsqueeze(0)  # assuming p is [1, T]
 
-        # Predict both
-        clean_logits = eval_.get_logits(clean, processor, args, model)
-        pert_logits = eval_.get_logits(perturbed, processor, args, model)
+        clean_logits = evaluation.get_logits(clean, processor, args, model)
+        pert_logits = evaluation.get_logits(perturbed, processor, args, model)
 
-        clean_pred = eval_.decode(clean_logits, processor)[0]
-        pert_pred = eval_.decode(pert_logits, processor)[0]
+        clean_pred = evaluation.decode(clean_logits, processor)[0]
+        pert_pred = evaluation.decode(pert_logits, processor)[0]
 
-        ground_truth = text_batch[0]
+        # Decide if sample is suspicious
+        is_sus = False
+        if args.attack_mode == "targeted":
+            is_sus = args.target in pert_pred
+        elif args.attack_mode == "untargeted":
+            is_sus = clean_pred != pert_pred
 
-        # Create folder
+        # Paths
         sample_dir = os.path.join(args.save_dir, f"sample_{i}")
-        os.makedirs(sample_dir, exist_ok=True)
+        sus_sample_dir = os.path.join(args.save_dir, f"sus_sample_{i}")
+
+        # Clear and choose correct directory
+        if is_sus:
+            if os.path.exists(sample_dir):
+                shutil.rmtree(sample_dir)
+            if os.path.exists(sus_sample_dir):
+                shutil.rmtree(sus_sample_dir)
+            os.makedirs(sus_sample_dir)
+            out_dir = sus_sample_dir
+        else:
+            if os.path.exists(sus_sample_dir):
+                shutil.rmtree(sus_sample_dir)
+            if os.path.exists(sample_dir):
+                shutil.rmtree(sample_dir)
+            os.makedirs(sample_dir)
+            out_dir = sample_dir
 
         # Save audio
-        save_audio(os.path.join(sample_dir, "clean.wav"), clean)
-        save_audio(os.path.join(sample_dir, "perturbed.wav"), perturbed)
+        save_audio(os.path.join(out_dir, "clean.wav"), clean)
+        save_audio(os.path.join(out_dir, "perturbed.wav"), perturbed)
 
-        # Save plots
-        # plot_pert(os.path.join(sample_dir, "clean.png"), clean)
-        # plot_pert(os.path.join(sample_dir, "perturbed.png"), perturbed)
-
-        name_tr = "transcription.txt"
-
-        if args.attack_mode=="targeted":
-            if args.target in pert_pred:
-                name_tr=f"target_in_transcription_epoch_{epoch}.txt"
-        else:
-            if clean_pred != pert_pred:
-                name_tr=f"sus_transcription_epoch_{epoch}.txt"
-
-        with open(os.path.join(sample_dir, name_tr), "w") as f:
+        name_tr = "sus_transcription.txt" if is_sus else "transcription.txt"
+        with open(os.path.join(out_dir, name_tr), "w") as f:
             f.write(f"Clean Pred:     {clean_pred}\n\n")
             f.write(f"Perturbed Pred: {pert_pred}\n\n")
+
 
 def stft_plot(path, tensor, args, sample_rate=16000, title="STFT Magnitude"):
     stft = fourier_transforms.compute_stft(tensor.squeeze(0), args)
@@ -204,11 +212,11 @@ def save_json_results(save_dir,
     if eval_score_clean is not None:
         results["eval_score_clean"] = eval_score_clean
     if eval_score_perturbed is not None:
-        results["eval_score_perturbed"] = eval_score_perturbed
+        results["evaluationscore_perturbed"] = eval_score_perturbed
     if best_train_score is not None:
         results["best_train_score"] = best_train_score
     if best_eval_score is not None:
-        results["best_eval_score"] = best_eval_score
+        results["best_evaluationscore"] = best_eval_score
     if final_test_clean is not None:
         results["test_loss_clean"] = final_test_clean
     if final_test_perturbed is not None:

@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 
 .train-clean-100/
+
+.doodles/

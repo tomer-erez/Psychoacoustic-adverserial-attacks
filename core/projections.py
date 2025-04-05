@@ -55,33 +55,33 @@ def project_min_max_freqs(args,stft_p, min_freq, max_freq):
     return stft_p
 
 
-def compute_fm_weighted_norm(stft_p: torch.Tensor, weights_matrix: np.ndarray) -> torch.Tensor:
+def compute_fm_weighted_norm_interp(stft_p: torch.Tensor, interp, args) -> torch.Tensor:
     """
     Computes perceptual (FM-weighted) norm of the STFT of the perturbation,
-    using a 2D perceptual weight matrix indexed by frequency and SPL bin (phon level).
+    using interpolated perceptual weights from SPL and frequency.
     """
 
     B, F, T = stft_p.shape
     power = stft_p.abs() ** 2
     spl = 10 * torch.log10(power + 1e-12)  # [B, F, T]
 
-    # Discretize SPL into phon bins (0 to 9)
-    phon_bin = (spl / 10).long()
-    phon_bin = torch.clamp(phon_bin, min=0, max=weights_matrix.shape[0] - 1)  # [B, F, T]
+    # Frequency values corresponding to each bin
+    freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).to(stft_p.device)  # [F]
 
-    # Frequency bin index (shared across batch and time)
-    freq_bins = torch.arange(F, device=stft_p.device).view(1, F, 1).expand(B, F, T)
-    freq_bins = torch.clamp(freq_bins, max=weights_matrix.shape[1] - 1)  # safety
+    # Expand frequencies to match shape: [B, F, T]
+    freqs_expanded = freqs.view(1, F, 1).expand(B, F, T)
+    phon_expanded = spl  # Treat SPL as a proxy for phon
 
-    # Index weights
-    weights_2d = torch.tensor(weights_matrix, device=stft_p.device, dtype=torch.float32)  # [P, F]
-    perceptual_weights = weights_2d[phon_bin, freq_bins]  # [B, F, T]
+    # Flatten to shape [N, 2] for querying the interpolator
+    query_points = torch.stack([phon_expanded, freqs_expanded], dim=-1).reshape(-1, 2).cpu().numpy()
+    weight_values = interp(query_points).reshape(B, F, T)
+    weights = torch.tensor(weight_values, device=stft_p.device, dtype=torch.float32)
 
-    weighted_power = power * perceptual_weights
+    weighted_power = power * weights
     return torch.sqrt(weighted_power.sum())
 
 
-def project_fm_norm(stft_p, args, weights_matrix):
+def project_fm_norm(stft_p, args, interp):
     """
     Projects the perturbation in the STFT domain to have a perceptual FM-weighted norm ≤ epsilon.
 
@@ -94,7 +94,7 @@ def project_fm_norm(stft_p, args, weights_matrix):
         torch.Tensor: Projected STFT perturbation with FM-weighted norm ≤ epsilon
     """
 
-    norm = compute_fm_weighted_norm(stft_p, weights_matrix)
+    norm = compute_fm_weighted_norm_interp(stft_p, interp, args)
     if norm <= args.fm_epsilon:
         return stft_p
     scale = args.fm_epsilon / norm.clamp(min=1e-8)

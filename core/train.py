@@ -1,11 +1,12 @@
 import torch
-from core import fourier_transforms, projections
+from core import fourier_transforms,projections
 import time
+from datetime import datetime
 
 def avg_scores(scores):
     return sum(scores) / len(scores)
 
-def perturbation_constraint(p,clean_audio, args,weights):
+def perturbation_constraint(p,clean_audio, args,interp):
     """
     Projects the perturbation to the allowed constraint set.
     Assumes input is a Tensor (not a Parameter).
@@ -24,18 +25,18 @@ def perturbation_constraint(p,clean_audio, args,weights):
                                                   min_freq=args.min_freq_attack,
                                                   max_freq=args.max_freq_attack)
         elif args.norm_type == "fletcher_munson":
-            p = projections.project_fm_norm(stft_p=p, args=args, weights_matrix=weights)
+            p = projections.project_fm_norm(stft_p=p, args=args, interp=interp)
 
         p= fourier_transforms.compute_istft(p, args=args)
 
-
-        if p.shape[-1] < clean_audio.shape[-1]:
-            # Pad to match
-            pad_amt = clean_audio.shape[-1] - p.shape[-1]
-            p = torch.nn.functional.pad(p, (0, pad_amt))
-        elif p.shape[-1] > clean_audio.shape[-1]:
-            # Crop to match
-            p = p[..., :clean_audio.shape[-1]]
+        if clean_audio is not None:
+            if p.shape[-1] < clean_audio.shape[-1]:
+                # Pad to match
+                pad_amt = clean_audio.shape[-1] - p.shape[-1]
+                p = torch.nn.functional.pad(p, (0, pad_amt))
+            elif p.shape[-1] > clean_audio.shape[-1]:
+                # Crop to match
+                p = p[..., :clean_audio.shape[-1]]
 
     # time domain norms
     else:
@@ -61,10 +62,13 @@ def get_loss_for_training(model, data, target_texts, processor, args):
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optimizer,weights):
+def train_epoch(args, train_data_loader, p, model, epoch,processor,optimizer,interp):
     scores = []
     times= []
     model.eval()
+    print(f"\n\n{'=' * 50}")
+    print(f'timestamp: {datetime.now()}\tstarting epoch: {epoch}')
+
     for batch_idx,(data, target_texts) in enumerate(train_data_loader):
         a=time.time()
         data=data.to(args.device)
@@ -82,7 +86,7 @@ def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optim
                 else:
                     p = p + args.lr * p.grad.sign()  # gradient ascent
 
-                p = perturbation_constraint(p=p, clean_audio=data, args=args,weights=weights)
+                p = perturbation_constraint(p=p, clean_audio=data, args=args,interp=interp)
             p = p.detach().requires_grad_()  # reset for next step
         else:
             raise NotImplementedError("not implemented other optimization types")
@@ -90,9 +94,9 @@ def train_epoch(args, train_data_loader, p, model, epoch, logger,processor,optim
         times.append(b-a)
 
         if batch_idx % args.report_interval == 0:
-            logger.info(f"batch: {batch_idx}/{len(train_data_loader)},\tavg_score {avg_scores(scores)},\tavg batch time {avg_scores(times)}")
+            print(f"batch: {batch_idx}/{len(train_data_loader)},\tavg_score {avg_scores(scores)},\tavg batch time {avg_scores(times)}")
 
     avg_score = avg_scores(scores)
-    logger.info(f"Train epoch number: {epoch}, avg score: {avg_score:.4f}")
+    print(f"Train epoch number: {epoch}, avg score: {avg_score:.4f}")
     # print(f"first train score was {scores[0]:.4f}\t last train score was {scores[-1]:.4f}")
     return p, avg_score
