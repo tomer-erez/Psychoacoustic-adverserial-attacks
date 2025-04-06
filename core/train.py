@@ -1,10 +1,23 @@
 import torch
-from core import fourier_transforms,projections
+from core import fourier_transforms,projections,loss_helpers
 import time
 from datetime import datetime
+import sys
+
 
 def avg_scores(scores):
     return sum(scores) / len(scores)
+
+def log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times):
+    print(f"batch: {batch_idx}/{total_batches},\t"
+          f"avg CTC: {avg_scores(ctc_scores):.0f},\t"
+          f"avg WER: {avg_scores(wer_scores):.3f},\t"
+          f"avg time: {avg_scores(times):.2f}")
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
+
 
 def perturbation_constraint(p,clean_audio, args,interp):
     """
@@ -45,30 +58,19 @@ def perturbation_constraint(p,clean_audio, args,interp):
     return p
 
 
-def get_loss_for_training(model, data, target_texts, processor, args):
-    if args.attack_mode == "targeted":
-        repeated_target = " ".join([args.target] * args.target_reps)
-        target_texts = [repeated_target] * len(data)
-
-
-    labels = processor(text=target_texts, return_tensors="pt", padding=True).input_ids.to(args.device)
-    labels[labels == processor.tokenizer.pad_token_id] = -100
-    outputs = model(input_values=data, labels=labels)
-    return outputs.loss, outputs.logits
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp):
-    scores = []
-    times = []
+
+def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp, wer_metric):
+    ctc_scores, wer_scores, times = [], [], []
     model.eval()
 
-    print(f"\n\n{'=' * 50}")
+    print(f"\n\n{'=' * 60}")
     print(f'timestamp: {datetime.now()}\tstarting epoch: {epoch}')
 
-    # Compute 5 fixed reporting points
     total_batches = len(train_data_loader)
-    report_points = set([int(r * total_batches) for r in [0.0, 0.2, 0.4, 0.6, 0.8]])
+    report_points = set([int(r * total_batches) for r in [0.0, 0.2, 0.4, 0.6, 0.8, 1]])
 
     for batch_idx, (data, target_texts) in enumerate(train_data_loader):
         a = time.time()
@@ -78,31 +80,26 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
         p.requires_grad_()
         data = data + p
 
-        loss, _ = get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
-        scores.append(loss.item())
+        loss, logits = loss_helpers.get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
+        ctc_scores.append(loss.item())
+
+        wer = loss_helpers.compute_ctc_and_wer_loss(logits, target_texts, processor, wer_metric)
+        wer_scores.append(wer)
 
         if args.optimize_type == "pgd":
-            loss.backward()  # gradient ascent
+            loss.backward()
             with torch.no_grad():
-                if args.attack_mode == "targeted":
-                    p = p - args.lr * p.grad.sign()
-                else:
-                    p = p + args.lr * p.grad.sign()
-
+                step = -args.lr if args.attack_mode == "targeted" else args.lr
+                p = p + step * p.grad.sign()
                 p = perturbation_constraint(p=p, clean_audio=data, args=args, interp=interp)
 
             p = p.detach().requires_grad_()
         else:
             raise NotImplementedError("Optimization type not implemented")
 
-        b = time.time()
-        times.append(b - a)
+        times.append(time.time() - a)
 
         if batch_idx in report_points:
-            print(f"batch: {batch_idx}/{total_batches},\t"
-                  f"avg perturbed train score: {avg_scores(scores):.4f},\t"
-                  f"avg batch time: {avg_scores(times):.4f}")
+            log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times)
 
-    avg_score = avg_scores(scores)
-    print(f"Train epoch number: {epoch}, avg score: {avg_score:.4f}")
-    return p, avg_score
+    return p, avg_scores(ctc_scores), avg_scores(wer_scores)

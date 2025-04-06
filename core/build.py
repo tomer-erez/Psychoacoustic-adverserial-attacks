@@ -238,7 +238,6 @@ def create_logger(args):
     print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}")
     sys.stdout.flush()
     sys.stderr.flush()
-    return None
 
 
 def init_perturbation(args,length,interp,first_batch_data):

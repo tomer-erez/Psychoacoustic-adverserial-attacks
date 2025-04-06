@@ -1,6 +1,6 @@
 # Psychoacoustically-Informed-Adversarial-Attacks-on-Speech-Recognition-Systems
 
-universal un-targeted adverserial attacks on speech recognition models, 
+adverserial attacks on speech recognition models, 
 
 focused on perturbations with low imperceptibility likelihood by the human ear.
 
@@ -14,24 +14,15 @@ use the conda env installation file attached.
 
 ``conda env create -f cs236207.yaml``
 
-run with downloading the dataset (omit the flag else)
-
+# run:
 ```
-python main.py --download_ds
+python main.py 
 ```
 
 # dataset:
 
 
-Common voice: you can either download it in script via the flag or get it from:
-
-https://commonvoice.mozilla.org/en/datasets
-
-or the libreespeech (preferably not because wav2vec2 is trained on it, hence the perturbation needs to train on something else)
-
-https://www.openslr.org/12
-
-
+Common voice: the script will download it for you, you might need to provide a login token to huggingface if requested the first time running it
 
 
 
@@ -40,5 +31,6 @@ https://www.openslr.org/12
 
 play around with the size of the attacks via the cli arguments, also specify the norm type
 
+you can add --small_data for testing 
 
 

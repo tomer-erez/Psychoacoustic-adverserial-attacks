@@ -1,9 +1,11 @@
 import torch
 import torchaudio
 import matplotlib.pyplot as plt
-from core import fourier_transforms,evaluation
+from core import fourier_transforms,evaluation,loss_helpers
 import random
 import shutil
+import json
+import os
 
 
 def save_audio(filename, tensor, sample_rate=16000, amplify=1.0):
@@ -49,16 +51,17 @@ def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
     chosen_samples = random.sample(all_samples, args.num_items_to_inspect)
 
     for i, (audio_batch, text_batch) in enumerate(chosen_samples):
-        audio = audio_batch[0].to(args.device)  # [T]
+        k = random.randint(0, len(audio_batch) - 1)
+        audio = audio_batch[k].to(args.device)
         clean = audio.clone().unsqueeze(0)
-        perturbed = (audio + p.squeeze(0)).unsqueeze(0)  # assuming p is [1, T]
+        perturbed = (audio + p.squeeze(0)).unsqueeze(0)
 
-        clean_logits = evaluation.get_logits(clean, processor, args, model)
-        pert_logits = evaluation.get_logits(perturbed, processor, args, model)
+        clean_logits = loss_helpers.get_logits(clean, processor, args, model)
+        pert_logits = loss_helpers.get_logits(perturbed, processor, args, model)
 
-        clean_pred = evaluation.decode(clean_logits, processor)[0]
-        pert_pred = evaluation.decode(pert_logits, processor)[0]
-
+        clean_pred = loss_helpers.decode(clean_logits, processor)[0]
+        pert_pred = loss_helpers.decode(pert_logits, processor)[0]
+        ground_truth = text_batch[k]
         # Decide if sample is suspicious
         is_sus = False
         if args.attack_mode == "targeted":
@@ -92,9 +95,9 @@ def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
 
         name_tr = "sus_transcription.txt" if is_sus else "transcription.txt"
         with open(os.path.join(out_dir, name_tr), "w") as f:
-            f.write(f"{'Ground Truth:'.ljust(22)}{text_batch}\n\n")
-            f.write(f"{'Clean Prediction:'.ljust(22)}{clean_pred}\n\n")
-            f.write(f"{'Perturbed Prediction:'.ljust(22)}{pert_pred}\n\n")
+            f.write(f"{'Ground Truth:'.ljust(20)}{ground_truth}\n\n")
+            f.write(f"{'Clean Prediction:'.ljust(20)}{clean_pred}\n\n")
+            f.write(f"{'Perturbed Prediction:'.ljust(20)}{pert_pred}\n\n")
 
 
 
@@ -137,31 +140,34 @@ def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
         epoch=epoch_num
     )
 
-def save_loss_plot(train_scores, eval_scores_perturbed, eval_scores_clean, save_dir, norm_type, clean_test_loss=None, perturbed_test_loss=None):
-    plt.figure(figsize=(10, 6))
-
-    x = list(range(len(train_scores)))  # Epoch indices
-
-    plt.plot(x, train_scores, label='Train Loss', marker='o')
-    plt.plot(x, eval_scores_clean, label='Eval Loss (Clean)', marker='^')
-    plt.plot(x, eval_scores_perturbed, label='Eval Loss (Perturbed)', marker='x')
-
-    if clean_test_loss is not None:
-        plt.axhline(y=clean_test_loss, color='green', linestyle='--', label='Clean Test Loss')
-
-    if perturbed_test_loss is not None:
-        plt.axhline(y=perturbed_test_loss, color='red', linestyle='--', label='Perturbed Test Loss')
-
-    plt.xlabel("Epoch")
-    plt.ylabel("CTC Loss")
-    plt.title(f"Loss Curve — Norm Type: {norm_type}")
-    plt.legend()
-    plt.grid(True)
-
+def save_loss_plot(train_scores, eval_scores_perturbed, eval_scores_clean, save_dir, norm_type,
+                   clean_test_loss=None, perturbed_test_loss=None):
     os.makedirs(save_dir, exist_ok=True)
-    plot_path = os.path.join(save_dir, "loss_plot.png")
-    plt.savefig(plot_path)
-    plt.close()
+
+    x = list(range(len(train_scores["ctc"])))  # Epoch indices
+
+    for loss_type in ["ctc", "wer"]:
+        plt.figure(figsize=(10, 6))
+        plt.plot(x, train_scores[loss_type], label='Train', marker='o')
+        plt.plot(x, eval_scores_clean[loss_type], label='Eval Clean', marker='^')
+        plt.plot(x, eval_scores_perturbed[loss_type], label='Eval Perturbed', marker='x')
+
+        if clean_test_loss is not None:
+            plt.axhline(y=clean_test_loss[loss_type], color='green', linestyle='--', label='Clean Test')
+
+        if perturbed_test_loss is not None:
+            plt.axhline(y=perturbed_test_loss[loss_type], color='red', linestyle='--', label='Perturbed Test')
+
+        plt.xlabel("Epoch")
+        plt.ylabel(f"{loss_type.upper()} Loss")
+        plt.title(f"{loss_type.upper()} Loss Curve — Norm Type: {norm_type}")
+        plt.legend()
+        plt.grid(True)
+
+        plot_path = os.path.join(save_dir, f"loss_plot_{loss_type}.png")
+        plt.savefig(plot_path)
+        plt.close()
+
 
 
 def plot_fm_weights(freqs, weights, path="fm_weights.png"):
@@ -183,8 +189,7 @@ def plot_fm_weights(freqs, weights, path="fm_weights.png"):
 
 
 
-import json
-import os
+
 
 def save_json_results(save_dir,
                       norm_type,
@@ -197,10 +202,10 @@ def save_json_results(save_dir,
                       best_eval_score=None,
                       final_test_clean=None,
                       final_test_perturbed=None):
-    """
-    Saves all relevant results to a JSON file (overwrites each call).
-    """
     json_path = os.path.join(save_dir, "results.json")
+
+    def safe_to_float(v):
+        return {k: float(v[k]) for k in v} if isinstance(v, dict) else float(v)
 
     results = {
         "norm_type": norm_type,
@@ -210,21 +215,26 @@ def save_json_results(save_dir,
     if epoch is not None:
         results["epoch"] = epoch
     if train_score is not None:
-        results["train_score"] = train_score
+        results["train_score"] = safe_to_float(train_score)
     if eval_score_clean is not None:
-        results["eval_score_clean"] = eval_score_clean
+        results["eval_score_clean"] = safe_to_float(eval_score_clean)
     if eval_score_perturbed is not None:
-        results["evaluationscore_perturbed"] = eval_score_perturbed
+        results["eval_score_perturbed"] = safe_to_float(eval_score_perturbed)
     if best_train_score is not None:
-        results["best_train_score"] = best_train_score
+        results["best_train_score"] = safe_to_float(best_train_score)
     if best_eval_score is not None:
-        results["best_evaluationscore"] = best_eval_score
+        results["best_eval_score"] = safe_to_float(best_eval_score)
     if final_test_clean is not None:
-        results["test_loss_clean"] = final_test_clean
+        results["test_loss_clean"] = safe_to_float(final_test_clean)
     if final_test_perturbed is not None:
-        results["test_loss_perturbed"] = final_test_perturbed
+        results["test_loss_perturbed"] = safe_to_float(final_test_perturbed)
         if final_test_clean:
-            results["perturbation_efficiency"] = final_test_perturbed / final_test_clean
+            if isinstance(final_test_clean, dict):
+                results["perturbation_efficiency"] = {
+                    k: final_test_perturbed[k] / final_test_clean[k] for k in final_test_clean
+                }
+            else:
+                results["perturbation_efficiency"] = final_test_perturbed / final_test_clean
 
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)

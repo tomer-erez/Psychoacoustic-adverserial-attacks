@@ -6,18 +6,21 @@ channels:
   - fastai
   - defaults
 dependencies:
+  - python=3.10
   - pytorch==2.5.0
   - torchvision==0.20.0
   - torchaudio==2.5.0
   - pytorch-cuda=12.1
   - cuda-cudart-dev=12.1
-  - opencv-python-headless
-  - datasets
   - soundfile
-  - pip
-  - transformers
   - matplotlib
   - librosa
+  - pip
   - pip:
+      - opencv-python-headless
+      - datasets
+      - transformers
+      - evaluate
+      - jiwer
       - git+https://github.com/fra31/auto-attack
       - git+https://github.com/RobustBench/robustbench.git

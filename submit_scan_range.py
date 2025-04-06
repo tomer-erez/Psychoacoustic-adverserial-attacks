@@ -32,10 +32,12 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
     if size_value is None:
         return
     name_to_use = f"{norm_type}_{size_value}_{attack_mode}"
+    if attack_mode=="targeted" and target_word is not None:
+        name_to_use = f"{name_to_use}_{target_word}"
     # Generate unique filename
     script_filename = f"{name_to_use}.sh"
 
-    base_args = f"--batch_size 32 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
+    base_args = f"--batch_size 28 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -74,10 +76,10 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [60],
-        "min_max_freqs": [280],
-        "fletcher_munson": [1.7],
-        "l2": [],
+        "snr": [50],
+        "min_max_freqs": [305],
+        "fletcher_munson": [2.2],
+        "l2": [0.1],
         "linf": [],
     }
 
