@@ -25,7 +25,7 @@ def create_arg_parser():
                         help='Path to a saved perturbation .pt file to resume training from')
 
     """adverserial training specific params"""
-    parser.add_argument('--target_reps', type=int,default=3,
+    parser.add_argument('--target_reps', type=int,default=5,
                         help='how many times should the model predict the target word, for example if 1: <delete>, if 5: <delete delete delete delete delete> as the label to optimize')
     parser.add_argument('--target', type=str,
                         default="delete",help='Target phrase for targeted attacks')
@@ -46,7 +46,7 @@ def create_arg_parser():
     parser.add_argument('--l2_size', type=float,default=0.09,help='size of the l2 perturbation')
     parser.add_argument('--linf_size', type=float,default=0.0001,help='size of the linf perturbation')
     parser.add_argument('--snr_db', type=int,default=60,help='size of the signal to noise ratio ')
-    parser.add_argument('--min_freq_attack', type=int,default=300,help='min freq to perturb in, remember that the human threshold is ~20 hz')
+    parser.add_argument('--min_freq_attack', type=int,default=275,help='min freq to perturb in, remember that the human threshold is ~20 hz')
     parser.add_argument('--max_freq_attack', type=int,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
 
 

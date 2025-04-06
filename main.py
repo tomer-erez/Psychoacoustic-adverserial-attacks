@@ -3,6 +3,7 @@ import os
 from core import build, iso, evaluation, train, save, parser,log_helpers
 import sys
 import evaluate as hf_evaluate
+import uuid
 
 
 
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     model, processor = build.load_model(args)
     p = build.init_perturbation(args=args, length=audio_length, interp=interp, first_batch_data=next(iter(train_data_loader))[0])
     optimizer = build.create_optimizer(args=args, p=p)
-    wer_metric = hf_evaluate.load("wer")
+    wer_metric = hf_evaluate.load("wer",experiment_id=str(uuid.uuid4()))
 
     # Updated to store dicts with "ctc" and "wer"
     train_scores = {"ctc": [], "wer": []}

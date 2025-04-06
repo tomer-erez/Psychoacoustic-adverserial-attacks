@@ -95,9 +95,9 @@ def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
 
         name_tr = "sus_transcription.txt" if is_sus else "transcription.txt"
         with open(os.path.join(out_dir, name_tr), "w") as f:
-            f.write(f"{'Ground Truth:'.ljust(20)}{ground_truth}\n\n")
-            f.write(f"{'Clean Prediction:'.ljust(20)}{clean_pred}\n\n")
-            f.write(f"{'Perturbed Prediction:'.ljust(20)}{pert_pred}\n\n")
+            f.write(f"{'Ground Truth:'.ljust(28)}{ground_truth.lower()}\n\n")
+            f.write(f"{'Clean Prediction:'.ljust(28)}{clean_pred.lower()}\n\n")
+            f.write(f"{'Perturbed Prediction:'.ljust(28)}{pert_pred.lower()}\n\n")
 
 
 

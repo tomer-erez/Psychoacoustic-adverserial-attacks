@@ -80,6 +80,19 @@ Or a debug run with minimal data:
 python main.py --small_data --norm_type linf --linf_size 0.0002
 ```
 
+### Hidden attacks:
+
+according to some local testing here is each norm's size for a hidden attack:
+
+| norm                | size   |
+|---------------------|--------|
+| `--fm_epsilon`      | 2      |
+| `--l2_size`         | 0.35   |
+| `--linf_size`       | 0.0001 |
+| `--snr_db`          | 58     |
+| `--min_freq_attack` | 250    |
+
+
 
 ---
 

@@ -5,7 +5,7 @@ logs_dir='/home/tomer.erez/psychoacoustic_attacks/logs'
 os.makedirs(logs_dir, exist_ok=True)
 
 
-def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None):
+def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None,target_reps=5):
     """
     Generate a sbatch job script for a specific norm and size
 
@@ -44,7 +44,7 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
 
 
     if attack_mode == "targeted":
-        base_args += f" --attack_mode targeted --target \"{target_word}\""
+        base_args += f" --attack_mode targeted --target_reps {target_reps} --target \"{target_word}\""
 
     # Create the sbatch script
     sbatch_script = f'''#!/bin/bash
@@ -76,16 +76,16 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [50],
-        "min_max_freqs": [305],
-        "fletcher_munson": [2.2],
-        "l2": [0.1],
-        "linf": [],
+        "snr": [],
+        "min_max_freqs": [],
+        "fletcher_munson": [],
+        "l2": [0.4],
+        "linf": [0.0001],
     }
 
-
-    target_words = ["delete"]  # Sweep over these
     attack_mode = "untargeted"  # "untargeted" or "targeted"
+    target_words = ["delete"]  # Sweep over these
+    target_reps = 5
 
     # Find the max number of sizes among all norms
     max_len = max(len(sizes) for sizes in norm_ranges.values())
@@ -104,7 +104,8 @@ def submit_jobs():
                         script_filename = generate_sbatch_job(
                             norm_type, size_value,
                             attack_mode=attack_mode,
-                            target_word=target
+                            target_word=target,
+                            target_reps=target_reps
                         )
 
                         # Submit
