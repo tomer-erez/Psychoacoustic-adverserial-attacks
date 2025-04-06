@@ -43,10 +43,10 @@ def create_arg_parser():
                         default='fletcher_munson',help='type of norm to limit the perturbation')
     #sizes of perturbations
     parser.add_argument('--fm_epsilon', type=float,default=2,help='size of the fm_epsilon perturbation')
-    parser.add_argument('--l2_size', type=float,default=0.09,help='size of the l2 perturbation')
+    parser.add_argument('--l2_size', type=float,default=0.25,help='size of the l2 perturbation')
     parser.add_argument('--linf_size', type=float,default=0.0001,help='size of the linf perturbation')
-    parser.add_argument('--snr_db', type=int,default=60,help='size of the signal to noise ratio ')
-    parser.add_argument('--min_freq_attack', type=int,default=275,help='min freq to perturb in, remember that the human threshold is ~20 hz')
+    parser.add_argument('--snr_db', type=int,default=64,help='size of the signal to noise ratio ')
+    parser.add_argument('--min_freq_attack', type=int,default=250,help='min freq to perturb in, remember that the human threshold is ~20 hz')
     parser.add_argument('--max_freq_attack', type=int,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
 
 

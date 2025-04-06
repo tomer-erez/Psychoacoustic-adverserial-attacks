@@ -89,7 +89,7 @@ according to some local testing here is each norm's size for a hidden attack:
 | `--fm_epsilon`      | 2      |
 | `--l2_size`         | 0.35   |
 | `--linf_size`       | 0.0001 |
-| `--snr_db`          | 58     |
+| `--snr_db`          | 64     |
 | `--min_freq_attack` | 250    |
 
 

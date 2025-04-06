@@ -185,13 +185,14 @@ def create_logger(args):
     # Set save_dir and log_file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     all_logs_dir = os.path.join(os.path.dirname(current_dir), "logs")
-    args.save_dir = os.path.join(all_logs_dir, args.device, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
+    args.save_dir = os.path.join(all_logs_dir, args.device, args.attack_mode, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
     args.was_preempted=False
     args.had_checkpoint=False
 
     os.makedirs(args.save_dir, exist_ok=True)
 
     args.log_file = os.path.join(args.save_dir, 'train_log.txt')
+
 
     if os.path.exists(args.save_dir):
         print('was preempted or save directory already existed')

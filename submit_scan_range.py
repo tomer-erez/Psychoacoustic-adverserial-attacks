@@ -75,12 +75,20 @@ def submit_jobs():
     """
     Submit sbatch jobs iterleaved across norm types
     """
+    # norm_ranges = {
+    #     "snr": [1.8],
+    #     "min_max_freqs": [255],
+    #     "fletcher_munson": [1.9],
+    #     "l2": [0.22],
+    #     "linf": [0.0001],
+    # }
+
     norm_ranges = {
-        "snr": [],
+        "snr": [66],
         "min_max_freqs": [],
         "fletcher_munson": [],
-        "l2": [0.4],
-        "linf": [0.0001],
+        "l2": [],
+        "linf": [],
     }
 
     attack_mode = "untargeted"  # "untargeted" or "targeted"
