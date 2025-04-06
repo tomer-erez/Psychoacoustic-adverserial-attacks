@@ -1,22 +1,11 @@
 import torch
-from core import fourier_transforms,projections,loss_helpers
+from core import fourier_transforms,projections,loss_helpers,log_helpers
 import time
 from datetime import datetime
-import sys
 
 
 def avg_scores(scores):
     return sum(scores) / len(scores)
-
-def log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times):
-    print(f"batch: {batch_idx}/{total_batches},\t"
-          f"avg CTC: {avg_scores(ctc_scores):.0f},\t"
-          f"avg WER: {avg_scores(wer_scores):.3f},\t"
-          f"avg time: {avg_scores(times):.2f}")
-    sys.stdout.flush()
-    sys.stderr.flush()
-
-
 
 
 def perturbation_constraint(p,clean_audio, args,interp):
@@ -100,6 +89,6 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
         times.append(time.time() - a)
 
         if batch_idx in report_points:
-            log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times)
+            log_helpers.log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times)
 
     return p, avg_scores(ctc_scores), avg_scores(wer_scores)
