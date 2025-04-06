@@ -40,14 +40,6 @@ https://huggingface.co/settings/tokens
 
 ---
 
-Here's an improved and cleaner **Hyperparameters** section for your `README.md`, rewritten to:
-
-- Highlight only the **important and attack-specific arguments**
-- Give examples and context
-- Use a well-organized table
-- Provide a practical CLI example
-
----
 
 ## ⚙️ Key Hyperparameters
 
