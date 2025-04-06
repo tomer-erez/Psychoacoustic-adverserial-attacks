@@ -84,13 +84,13 @@ python main.py --small_data --norm_type linf --linf_size 0.0002
 
 according to some local testing here is each norm's size for a hidden attack:
 
-| norm                | size   |
-|---------------------|--------|
-| `--fm_epsilon`      | 2      |
-| `--l2_size`         | 0.35   |
-| `--linf_size`       | 0.0001 |
-| `--snr_db`          | 64     |
-| `--min_freq_attack` | 250    |
+| norm                | size            |
+|---------------------|-----------------|
+| `--fm_epsilon`      | 2 or lower      |
+| `--l2_size`         | 0.35 or lower   |
+| `--linf_size`       | 0.0001 or lower |
+| `--snr_db`          | 64 or higher    |
+| `--min_freq_attack` | 250 or lower    |
 
 
 
