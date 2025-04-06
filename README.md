@@ -45,24 +45,19 @@ https://huggingface.co/settings/tokens
 
 You can control the behavior of the attack using the following command-line arguments:
 
-| Argument              | Description                                                                                         | Example                                       |
-|-----------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| Argument              | Description                                                                                                        | Example                                       |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
 | `--norm_type`         | Type of norm used to constrain the perturbation. Choices: `l2`, `linf`, `snr`, `fletcher_munson`, `min_max_freqs`. | `--norm_type fletcher_munson`                |
-| `--attack_mode`       | Type of attack: `targeted` (force a word) or `untargeted` (increase error).                         | `--attack_mode targeted`                      |
-| `--target`            | Target phrase for targeted attacks. Only used in `targeted` mode.                                   | `--target "delete"`                           |
-| `--target_reps`       | How many times to repeat the target word in the label (e.g., `delete delete delete`).               | `--target_reps 3`                             |
-| `--loss_fn`           | Loss used to optimize the perturbation. Choices: `ctc`, `wer`.                                      | `--loss_fn wer`                               |
-| `--num_epochs`        | Number of training epochs.                                                                           | `--num_epochs 10`                             |
-| `--resume_from`       | Path to a saved perturbation `.pt` file to resume training from.                                    | `--resume_from path/to/pert.pt`               |
-| `--small_data`        | Use only a small subset (~1%) of the dataset for fast debugging.                                    | `--small_data`                                |
-| `--dataset`           | Which dataset to use. Prefer `CommonVoice` if attacking Wav2Vec2.                                   | `--dataset CommonVoice`                       |
-| `--fm_epsilon`        | Max perceptual norm for Fletcher-Munson constraint.                                                 | `--fm_epsilon 2.0`                            |
-| `--l2_size`           | L2 constraint (ε) for `l2`-norm attack.                                                              | `--l2_size 0.09`                              |
-| `--linf_size`         | Linf constraint (ε) for `linf`-norm attack.                                                          | `--linf_size 0.0001`                          |
-| `--snr_db`            | Desired SNR (in dB) for `snr`-based attack.                                                          | `--snr_db 60`                                 |
-| `--min_freq_attack`   | Minimum frequency to perturb (used in `min_max_freqs` mode).                                         | `--min_freq_attack 300`                       |
-| `--max_freq_attack`   | Maximum frequency to perturb.                                                                        | `--max_freq_attack 20000`                     |
-| `--num_items_to_inspect` | Number of samples to visualize with transcription comparison (GT, clean, perturbed).            | `--num_items_to_inspect 12`                   |
+| `--attack_mode`       | Type of attack: `targeted` (force a word) or `untargeted` (increase error).                                        | `--attack_mode targeted`                      |
+| `--target`            | Target phrase for targeted attacks. Only used in `targeted` mode.                                                  | `--target "delete"`                           |
+| `--target_reps`       | How many times to repeat the target word in the label (e.g., `delete delete delete`).                              | `--target_reps 3`                             |
+| `--small_data`        | Use only a small subset (~1%) of the dataset for fast debugging.                                                   | `--small_data`                                |
+| `--dataset`           | Which dataset to use. Prefer `CommonVoice` if attacking Wav2Vec2.                                                  | `--dataset CommonVoice`                       |
+| `--fm_epsilon`        | Max perceptual norm for Fletcher-Munson constraint.                                                                | `--fm_epsilon 2.0`                            |
+| `--l2_size`           | L2 constraint (ε) for `l2`-norm attack.                                                                            | `--l2_size 0.09`                              |
+| `--linf_size`         | Linf constraint (ε) for `linf`-norm attack.                                                                        | `--linf_size 0.0001`                          |
+| `--snr_db`            | Desired SNR (in dB) for `snr`-based attack.                                                                        | `--snr_db 60`                                 |
+| `--min_freq_attack`   | maximum frequency to perturb (used in `min_max_freqs` mode). frequenices above it will be set to zero              | `--min_freq_attack 300`                       |
 
 ---
 
@@ -100,7 +95,7 @@ python main.py --small_data --norm_type linf --linf_size 0.0002
 ## 👤 Author
 
 **Tomer Erez**  
-MSc Student, Technion – Israel Institute of Technology  
+MSc Computer science, Technion – Israel Institute of Technology  
 📧 tomer.erez@campus.technion.ac.il
 
 ---
@@ -108,5 +103,5 @@ MSc Student, Technion – Israel Institute of Technology
 ## 📄 License
 
 This project is for academic and research purposes only. Feel free to use and adapt it with credit.
-```
+
 
