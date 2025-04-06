@@ -119,7 +119,7 @@ def create_data_loaders(args):
         args.num_items_to_inspect = 1
     # Estimate fixed waveform length
     sample_lengths = [dataset[i][0].shape[1] for i in indices[:min(200, len(indices))]]
-    audio_length = int(torch.tensor(sample_lengths).float().quantile(0.85).item())
+    audio_length = int(torch.tensor(sample_lengths).float().quantile(0.75).item())
 
     # clip audios to be length
     collate_fn = make_collate_fn(audio_length)
@@ -153,10 +153,10 @@ def get_model_size_gb(model):
 
 def load_model(args):
     """
-    Load the ASR model from `args.model_path`.
+    Load the ASR model
     """
-    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h").to(args.device)
+    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-large-960h-lv60-self")
+    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-large-960h-lv60-self").to(args.device)
     print(f"Model size: {get_model_size_gb(model):.2f} GB")
     return model,processor
 
@@ -167,10 +167,8 @@ def create_logger(args):
     """
     # Determine attack size string
     size = ''
-    if args.norm_type in ["fletcher_munson", "leakage", "min_max_freqs"]:
-        if args.norm_type == "leakage":
-            size = f'{args.min_freq_leakage}'
-        elif args.norm_type == "min_max_freqs":
+    if args.norm_type in ["fletcher_munson", "min_max_freqs"]:
+        if args.norm_type == "min_max_freqs":
             size = f'{args.min_freq_attack}'
         elif args.norm_type == "fletcher_munson":
             size = f'{args.fm_epsilon}'

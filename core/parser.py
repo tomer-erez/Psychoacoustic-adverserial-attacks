@@ -39,7 +39,7 @@ def create_arg_parser():
 
     parser.add_argument('--norm_type', type=str,
                         choices=["l2","linf","snr",
-                                  "fletcher_munson","leakage","min_max_freqs"],
+                                  "fletcher_munson","min_max_freqs"],
                         default='fletcher_munson',help='type of norm to limit the perturbation')
     #sizes of perturbations
     parser.add_argument('--fm_epsilon', type=float,default=2,help='size of the fm_epsilon perturbation')
@@ -47,9 +47,7 @@ def create_arg_parser():
     parser.add_argument('--linf_size', type=float,default=0.0001,help='size of the linf perturbation')
     parser.add_argument('--snr_db', type=int,default=60,help='size of the signal to noise ratio ')
     parser.add_argument('--min_freq_attack', type=int,default=300,help='min freq to perturb in, remember that the human threshold is ~20 hz')
-    parser.add_argument('--max_freq_attack', type=int,default=2e4,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
-    parser.add_argument('--min_freq_leakage', type=int,default=20,help='min freq to attack in leakage meaning the humans exact frequency boundaries, remember that the human threshold is ~20 hz')
-    parser.add_argument('--max_freq_leakage', type=int,default=2e4,help='max freq to attack in leakage meaning the humans exact frequency boundaries, remember that the human threshold is ~20000 hz')
+    parser.add_argument('--max_freq_attack', type=int,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
 
 
     """sound properties"""
@@ -62,10 +60,9 @@ def create_arg_parser():
     parser.add_argument('--seed', type=int,default=5,help='random seed for reproducibility')
     parser.add_argument('--jobid', type=str,
                         default='9999',help='job id')
-    parser.add_argument('--report_interval', type=int,default=100,help='report interval')
     parser.add_argument('--small_data', action='store_true',
                         help='If set, use only 1% of the dataset for fast debugging')
-    parser.add_argument('--num_items_to_inspect', type=int,default=10,help='number of items to inspect, visualize')
+    parser.add_argument('--num_items_to_inspect', type=int,default=12,help='number of items to inspect and save in the save_dir, meaning sentences to write with their true label, clean prediction and perturbed prediction')
 
 
     return parser

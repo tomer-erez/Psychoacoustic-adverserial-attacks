@@ -92,8 +92,10 @@ def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
 
         name_tr = "sus_transcription.txt" if is_sus else "transcription.txt"
         with open(os.path.join(out_dir, name_tr), "w") as f:
-            f.write(f"Clean Pred:     {clean_pred}\n\n")
-            f.write(f"Perturbed Pred: {pert_pred}\n\n")
+            f.write(f"{'Ground Truth:'.ljust(22)}{text_batch}\n\n")
+            f.write(f"{'Clean Prediction:'.ljust(22)}{clean_pred}\n\n")
+            f.write(f"{'Perturbed Prediction:'.ljust(22)}{pert_pred}\n\n")
+
 
 
 def stft_plot(path, tensor, args, sample_rate=16000, title="STFT Magnitude"):

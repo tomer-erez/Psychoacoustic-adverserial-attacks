@@ -13,14 +13,10 @@ def perturbation_constraint(p,clean_audio, args,interp):
     Applies constraint based on the selected norm type.
     """
     # --- frequency domain norms:
-    if args.norm_type in ["fletcher_munson", "leakage","min_max_freqs"]:
+    if args.norm_type in ["fletcher_munson" ,"min_max_freqs"]:
         p = fourier_transforms.compute_stft(p, args=args)#to freq
 
-        if args.norm_type == "leakage":
-            p = projections.project_min_max_freqs(args, stft_p=p,
-                                                  min_freq=args.min_freq_leakage,
-                                                  max_freq=args.max_freq_leakage)
-        elif args.norm_type == "min_max_freqs":
+        if args.norm_type == "min_max_freqs":
             p = projections.project_min_max_freqs(args, stft_p=p,
                                                   min_freq=args.min_freq_attack,
                                                   max_freq=args.max_freq_attack)
@@ -62,41 +58,51 @@ def get_loss_for_training(model, data, target_texts, processor, args):
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch,processor,optimizer,interp):
+def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp):
     scores = []
-    times= []
+    times = []
     model.eval()
+
     print(f"\n\n{'=' * 50}")
     print(f'timestamp: {datetime.now()}\tstarting epoch: {epoch}')
 
-    for batch_idx,(data, target_texts) in enumerate(train_data_loader):
-        a=time.time()
-        data=data.to(args.device)
-        data.requires_grad=False
+    # Compute 5 fixed reporting points
+    total_batches = len(train_data_loader)
+    report_points = set([int(r * total_batches) for r in [0.0, 0.2, 0.4, 0.6, 0.8]])
+
+    for batch_idx, (data, target_texts) in enumerate(train_data_loader):
+        a = time.time()
+
+        data = data.to(args.device)
+        data.requires_grad = False
         p.requires_grad_()
         data = data + p
-        loss, _ = get_loss_for_training(model=model, data=data,target_texts=target_texts,processor=processor,args=args)
+
+        loss, _ = get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
         scores.append(loss.item())
 
         if args.optimize_type == "pgd":
-            (loss).backward()  # <-- YES, when doing gradient ascent
+            loss.backward()  # gradient ascent
             with torch.no_grad():
-                if args.attack_mode=="targeted":
-                    p = p - args.lr * p.grad.sign()  # gradient descent
+                if args.attack_mode == "targeted":
+                    p = p - args.lr * p.grad.sign()
                 else:
-                    p = p + args.lr * p.grad.sign()  # gradient ascent
+                    p = p + args.lr * p.grad.sign()
 
-                p = perturbation_constraint(p=p, clean_audio=data, args=args,interp=interp)
-            p = p.detach().requires_grad_()  # reset for next step
+                p = perturbation_constraint(p=p, clean_audio=data, args=args, interp=interp)
+
+            p = p.detach().requires_grad_()
         else:
-            raise NotImplementedError("not implemented other optimization types")
-        b=time.time()
-        times.append(b-a)
+            raise NotImplementedError("Optimization type not implemented")
 
-        if batch_idx % args.report_interval == 0:
-            print(f"batch: {batch_idx}/{len(train_data_loader)},\tavg_score {avg_scores(scores)},\tavg batch time {avg_scores(times)}")
+        b = time.time()
+        times.append(b - a)
+
+        if batch_idx in report_points:
+            print(f"batch: {batch_idx}/{total_batches},\t"
+                  f"avg perturbed train score: {avg_scores(scores):.4f},\t"
+                  f"avg batch time: {avg_scores(times):.4f}")
 
     avg_score = avg_scores(scores)
     print(f"Train epoch number: {epoch}, avg score: {avg_score:.4f}")
-    # print(f"first train score was {scores[0]:.4f}\t last train score was {scores[-1]:.4f}")
     return p, avg_score

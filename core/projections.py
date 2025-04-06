@@ -63,7 +63,7 @@ def compute_fm_weighted_norm_interp(stft_p: torch.Tensor, interp, args) -> torch
 
     B, F, T = stft_p.shape
     power = stft_p.abs() ** 2
-    spl = 10 * torch.log10(power + 1e-12)  # [B, F, T]
+    spl = 10 * torch.log10(power + 1e-10)  # [B, F, T]
 
     # Frequency values corresponding to each bin
     freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).to(stft_p.device)  # [F]
@@ -73,7 +73,7 @@ def compute_fm_weighted_norm_interp(stft_p: torch.Tensor, interp, args) -> torch
     phon_expanded = spl  # Treat SPL as a proxy for phon
 
     # Flatten to shape [N, 2] for querying the interpolator
-    query_points = torch.stack([phon_expanded, freqs_expanded], dim=-1).reshape(-1, 2).cpu().numpy()
+    query_points = torch.stack([phon_expanded, freqs_expanded], dim=-1).reshape(-1, 2).detach().cpu().numpy()
     weight_values = interp(query_points).reshape(B, F, T)
     weights = torch.tensor(weight_values, device=stft_p.device, dtype=torch.float32)
 

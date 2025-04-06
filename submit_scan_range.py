@@ -35,7 +35,7 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
     # Generate unique filename
     script_filename = f"{name_to_use}.sh"
 
-    base_args = f"--batch_size 64 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
+    base_args = f"--batch_size 32 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -74,16 +74,16 @@ def submit_jobs():
     Submit sbatch jobs iterleaved across norm types
     """
     norm_ranges = {
-        "snr": [50],
-        "min_max_freqs": [350],
-        "fletcher_munson": [5],
+        "snr": [60],
+        "min_max_freqs": [280],
+        "fletcher_munson": [1.7],
         "l2": [],
         "linf": [],
     }
 
 
     target_words = ["delete"]  # Sweep over these
-    attack_mode = "targeted"  # "untargeted" or "targeted"
+    attack_mode = "untargeted"  # "untargeted" or "targeted"
 
     # Find the max number of sizes among all norms
     max_len = max(len(sizes) for sizes in norm_ranges.values())
