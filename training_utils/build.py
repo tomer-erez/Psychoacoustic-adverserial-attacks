@@ -1,18 +1,14 @@
 import torch
 import torch.optim as optim
 import shutil
-import logging
 import os
-import sys
 import json
 import random
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH  # Example ASR dataset
-import numpy as np
-import scipy.interpolate
 from torch.utils.data import Subset, DataLoader
-from core.train import perturbation_constraint
+from training_utils.train import perturbation_constraint
 import sys
 from datasets import load_dataset, Audio
 
@@ -185,7 +181,7 @@ def create_logger(args):
     # Set save_dir and log_file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     all_logs_dir = os.path.join(os.path.dirname(current_dir), "logs")
-    args.save_dir = os.path.join(all_logs_dir, args.device, args.attack_mode, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
+    args.save_dir = os.path.join(all_logs_dir, args.attack_mode, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
     args.was_preempted=False
     args.had_checkpoint=False
 

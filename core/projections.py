@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import scipy.interpolate
 
 def project_snr(clean, perturbation, snr_db):
     """
