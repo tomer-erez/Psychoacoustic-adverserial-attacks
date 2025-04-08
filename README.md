@@ -1,6 +1,6 @@
 
 
-# Psychoacoustically-Informed Adversarial Attacks on Speech Recognition Systems
+# Psychoacoustic Adversarial Attacks on speech recognition models
 
 This project explores adversarial attacks on automatic speech recognition (ASR) models, with a focus on crafting **perturbations that are difficult for humans to perceive** but significantly degrade model performance.
 
