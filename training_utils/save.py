@@ -148,15 +148,15 @@ def save_loss_plot(train_scores, eval_scores_perturbed, eval_scores_clean, save_
 
     for loss_type in ["ctc", "wer"]:
         plt.figure(figsize=(10, 6))
-        plt.plot(x, train_scores[loss_type], label='Train', marker='o')
-        plt.plot(x, eval_scores_clean[loss_type], label='Eval Clean', marker='^')
-        plt.plot(x, eval_scores_perturbed[loss_type], label='Eval Perturbed', marker='x')
+        plt.plot(x, train_scores[loss_type], label='Train', marker='o', linestyle='-', color='blue')
+        plt.plot(x, eval_scores_clean[loss_type], label='Eval Clean', marker='^', linestyle='-', color='orange')
+        plt.plot(x, eval_scores_perturbed[loss_type], label='Eval Perturbed', marker='x', linestyle='-', color='purple')
 
         if clean_test_loss is not None:
-            plt.axhline(y=clean_test_loss[loss_type], color='green', linestyle='--', label='Clean Test')
+            plt.axhline(y=clean_test_loss[loss_type], linestyle='-', color='green', label='Clean Test')
 
         if perturbed_test_loss is not None:
-            plt.axhline(y=perturbed_test_loss[loss_type], color='red', linestyle='--', label='Perturbed Test')
+            plt.axhline(y=perturbed_test_loss[loss_type], linestyle='-', color='red', label='Perturbed Test')
 
         plt.xlabel("Epoch")
         plt.ylabel(f"{loss_type.upper()} Loss")

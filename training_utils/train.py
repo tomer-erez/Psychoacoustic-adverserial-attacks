@@ -20,9 +20,7 @@ def perturbation_constraint(p,clean_audio, args,interp):
         p = fourier_transforms.compute_stft(p, args=args)#to freq
 
         if args.norm_type == "min_max_freqs":
-            p = projections.project_min_max_freqs(args, stft_p=p,
-                                                  min_freq=args.min_freq_attack,
-                                                  max_freq=args.max_freq_attack)
+            p = projections.project_min_max_freqs(args, stft_p=p,min_freq=args.min_freq_attack,max_freq=args.max_freq_attack)
         elif args.norm_type == "fletcher_munson":
             p = projections.project_fm_norm(stft_p=p, args=args, interp=interp)
 
@@ -45,6 +43,8 @@ def perturbation_constraint(p,clean_audio, args,interp):
             p = projections.project_linf(p, -args.linf_size, args.linf_size)
         elif args.norm_type=="snr":
             p = projections.project_snr(clean=clean_audio, perturbation=p, snr_db=args.snr_db)
+        elif args.norm_type=="tv":
+            p=projections.project_tv(p=p,args=args,clean_audio=clean_audio)
     return p
 
 

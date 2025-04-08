@@ -45,19 +45,20 @@ https://huggingface.co/settings/tokens
 
 You can control the behavior of the attack using the following command-line arguments:
 
-| Argument              | Description                                                                                                        | Example                                       |
-|-----------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
-| `--norm_type`         | Type of norm used to constrain the perturbation. Choices: `l2`, `linf`, `snr`, `fletcher_munson`, `min_max_freqs`. | `--norm_type fletcher_munson`                |
-| `--attack_mode`       | Type of attack: `targeted` (force a word) or `untargeted` (increase error).                                        | `--attack_mode targeted`                      |
-| `--target`            | Target phrase for targeted attacks. Only used in `targeted` mode.                                                  | `--target "delete"`                           |
-| `--target_reps`       | How many times to repeat the target word in the label (e.g., `delete delete delete`).                              | `--target_reps 3`                             |
-| `--small_data`        | Use only a small subset (~1%) of the dataset for fast debugging.                                                   | `--small_data`                                |
-| `--dataset`           | Which dataset to use. Prefer `CommonVoice` if attacking Wav2Vec2.                                                  | `--dataset CommonVoice`                       |
-| `--fm_epsilon`        | Max perceptual norm for Fletcher-Munson constraint.                                                                | `--fm_epsilon 2.0`                            |
-| `--l2_size`           | L2 constraint (ε) for `l2`-norm attack.                                                                            | `--l2_size 0.09`                              |
-| `--linf_size`         | Linf constraint (ε) for `linf`-norm attack.                                                                        | `--linf_size 0.0001`                          |
-| `--snr_db`            | Desired SNR (in dB) for `snr`-based attack.                                                                        | `--snr_db 60`                                 |
-| `--min_freq_attack`   | maximum frequency to perturb (used in `min_max_freqs` mode). frequenices above it will be set to zero              | `--min_freq_attack 300`                       |
+| Argument            | Description                                                                                                              | Example                                       |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| `--norm_type`       | Type of norm used to constrain the perturbation. Choices: `tv`, `l2`, `linf`, `snr`, `fletcher_munson`, `min_max_freqs`. | `--norm_type fletcher_munson`                |
+| `--attack_mode`     | Type of attack: `targeted` (force a word) or `untargeted` (increase error).                                              | `--attack_mode targeted`                      |
+| `--target`          | Target phrase for targeted attacks. Only used in `targeted` mode.                                                        | `--target "delete"`                           |
+| `--target_reps`     | How many times to repeat the target word in the label (e.g., `delete delete delete`).                                    | `--target_reps 3`                             |
+| `--small_data`      | Use only a small subset (~1%) of the dataset for fast debugging.                                                         | `--small_data`                                |
+| `--dataset`         | Which dataset to use. Prefer `CommonVoice` if attacking Wav2Vec2.                                                        | `--dataset CommonVoice`                       |
+| `--fm_epsilon`      | Max perceptual norm for Fletcher-Munson constraint.                                                                      | `--fm_epsilon 2.0`                            |
+| `--l2_size`         | L2 constraint (ε) for `l2`-norm attack.                                                                                  | `--l2_size 0.09`                              |
+| `--linf_size`       | Linf constraint (ε) for `linf`-norm attack.                                                                              | `--linf_size 0.0001`                          |
+| `--snr_db`          | Desired SNR (in dB) for `snr`-based attack.                                                                              | `--snr_db 60`                                 |
+| `--min_freq_attack` | maximum frequency to perturb (used in `min_max_freqs` mode). frequenices above it will be set to zero                    | `--min_freq_attack 300`                       |
+| `--tv_epsilon`      | maximum total variation allowed                                                                                          | `--min_freq_attack 300`                       |
 
 ---
 

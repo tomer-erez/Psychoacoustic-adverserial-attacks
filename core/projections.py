@@ -37,6 +37,20 @@ def project_l2(p, epsilon):
     return p
 
 
+def project_l1(p, args):
+    norm = torch.norm(p, p=1)
+    if norm > args.l1_epsilon:
+        return p * (args.l1_epsilon / norm)
+    return p
+
+def project_tv(p, args, clean_audio):
+    base_tv = torch.sum(torch.abs(clean_audio[:, 1:] - clean_audio[:, :-1]))
+    epsilon = args.tv_epsilon * base_tv
+    tv_norm = torch.sum(torch.abs(p[:, 1:] - p[:, :-1]))
+    if tv_norm > epsilon:
+        return p * (epsilon / tv_norm)
+    return p
+
 def project_min_max_freqs(args,stft_p, min_freq, max_freq):
 
     # Get frequencies for STFT bins
@@ -50,7 +64,6 @@ def project_min_max_freqs(args,stft_p, min_freq, max_freq):
     # Apply mask
     stft_p = stft_p * mask
 
-    # Inverse STFT to time domain
     return stft_p
 
 

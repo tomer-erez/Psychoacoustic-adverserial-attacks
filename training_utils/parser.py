@@ -8,7 +8,7 @@ def create_arg_parser():
     """standard training params"""
     parser.add_argument('--batch_size', type=int,default=64,help='batch size')
     parser.add_argument('--lr', type=float,default=1e-4,help='lr for the perturbation update')
-    parser.add_argument('--early_stopping', type=int,default=3,help='how many epochs to wait before early stopping')
+    parser.add_argument('--early_stopping', type=int,default=5,help='how many epochs to wait before early stopping')
     parser.add_argument('--num_epochs', type=int,default=30,help='how many epochs at all')
     parser.add_argument('--optimize_type', type=str,
                         choices=["adam","pgd"],
@@ -38,8 +38,7 @@ def create_arg_parser():
 
 
     parser.add_argument('--norm_type', type=str,
-                        choices=["l2","linf","snr",
-                                  "fletcher_munson","min_max_freqs"],
+                        choices=["l2","linf","snr","tv","fletcher_munson","min_max_freqs"],
                         default='fletcher_munson',help='type of norm to limit the perturbation')
     #sizes of perturbations
     parser.add_argument('--fm_epsilon', type=float,default=2,help='size of the fm_epsilon perturbation')
@@ -48,6 +47,7 @@ def create_arg_parser():
     parser.add_argument('--snr_db', type=int,default=64,help='size of the signal to noise ratio ')
     parser.add_argument('--min_freq_attack', type=int,default=250,help='min freq to perturb in, remember that the human threshold is ~20 hz')
     parser.add_argument('--max_freq_attack', type=int,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
+    parser.add_argument('--tv_epsilon', type=float,default=0.01,help='Total Variation constraint')
 
 
     """sound properties"""

@@ -175,6 +175,8 @@ def create_logger(args):
             size = f"{args.linf_size}"
         elif args.norm_type == "snr":
             size = f"{args.snr_db}"
+        elif args.norm_type == "tv":
+            size = f"{args.tv_epsilon}"
     args.attack_size_string = size
 
 
