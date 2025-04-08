@@ -6,7 +6,7 @@ import random
 import shutil
 import json
 import os
-
+import numpy as np
 
 def save_audio(filename, tensor, sample_rate=16000, amplify=1.0):
     tensor = tensor.detach().cpu()
@@ -101,27 +101,54 @@ def inspect_random_samples(args, test_data_loader, p, model, processor, epoch):
 
 
 
-def stft_plot(path, tensor, args, sample_rate=16000, title="STFT Magnitude"):
+def stft_plot(path, tensor, args, title="STFT Magnitude"):
     stft = fourier_transforms.compute_stft(tensor.squeeze(0), args)
     magnitude = stft.abs().detach().cpu()
+    db = 20 * torch.log10(magnitude + 1e-8)
 
-    # Compute frequency bins in Hz
-    freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / sample_rate).numpy()
 
+    # Frequency axis (Hz)
+    freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).numpy()
+    time = np.arange(magnitude.shape[1])
+
+    # Plot 1: Linear frequency scale
     plt.figure(figsize=(10, 4))
     plt.imshow(
-        20 * torch.log10(magnitude + 1e-8),
+        db,
         aspect="auto",
         origin="lower",
         interpolation="none",
-        extent=[0, magnitude.shape[1], freqs[0], freqs[-1]]  # Set frequency axis (y) in Hz
+        extent=[time[0], time[-1], freqs[0], freqs[-1]]
     )
-    plt.title(title)
+    plt.title(title + " (Linear Frequency Scale)")
     plt.xlabel("Time Frame")
     plt.ylabel("Frequency (Hz)")
     plt.colorbar(label="Amplitude (dB)")
     plt.tight_layout()
-    plt.savefig(path)
+    plt.savefig(path + "_linear.png")
+    plt.close()
+
+    # Plot 2: Log frequency scale
+    plt.figure(figsize=(10, 4))
+    plt.imshow(
+        db,
+        aspect="auto",
+        origin="lower",
+        interpolation="none",
+        extent=[time[0], time[-1], freqs[0], freqs[-1]]
+    )
+    plt.yscale("log")
+    plt.title(title + " (Log Frequency Scale)")
+    plt.xlabel("Time Frame")
+    plt.ylabel("Frequency (Hz, log scale)")
+
+    # Set custom ticks for log scale
+    log_ticks = [1, 10, 100, 1000, 10000]
+    plt.yticks(log_ticks, [f"{f}" for f in log_ticks])
+    plt.ylim(freqs[1], freqs[-1])  # Avoid log(0)
+    plt.colorbar(label="Amplitude (dB)")
+    plt.tight_layout()
+    plt.savefig(path + "_log.png")
     plt.close()
 
 
@@ -239,3 +266,39 @@ def save_json_results(save_dir,
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
 
+
+def plot_debug_phon(mag_db,mag_db_clipped,scaled_thresh,args,tag):
+    # Select first sample in batch for visualization
+    mag_db_np = mag_db[0].detach().cpu().numpy()
+    mag_db_clipped_np = mag_db_clipped[0].detach().cpu().numpy()
+    contour_np = scaled_thresh[0].squeeze().detach().cpu().numpy()
+
+    time_frames = mag_db_np.shape[1]
+    freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).cpu().numpy()
+
+    fig, axs = plt.subplots(3, 1, figsize=(10, 12), constrained_layout=True)
+
+    # 1. Before
+    axs[0].imshow(mag_db_np, aspect='auto', origin='lower', extent=[0, time_frames, freqs[0], freqs[-1]], cmap='viridis')
+    axs[0].plot(np.arange(time_frames), [contour_np]*time_frames, color='r', label='Phon Threshold')
+    axs[0].set_title("Original STFT Magnitude (dB)")
+    axs[0].set_ylabel("Frequency (Hz)")
+    axs[0].legend()
+
+    # 2. After
+    axs[1].imshow(mag_db_clipped_np, aspect='auto', origin='lower', extent=[0, time_frames, freqs[0], freqs[-1]], cmap='viridis')
+    axs[1].plot(np.arange(time_frames), [contour_np]*time_frames, color='r', label='Phon Threshold')
+    axs[1].set_title("Clipped STFT Magnitude (dB)")
+    axs[1].set_ylabel("Frequency (Hz)")
+    axs[1].legend()
+
+    # 3. Difference
+    diff = mag_db_np - mag_db_clipped_np
+    axs[2].imshow(diff, aspect='auto', origin='lower', extent=[0, time_frames, freqs[0], freqs[-1]], cmap='coolwarm')
+    axs[2].set_title("Difference (Before - After)")
+    axs[2].set_xlabel("Time Frame")
+    axs[2].set_ylabel("Frequency (Hz)")
+
+    plt.suptitle(f"Phon-Level Constraint Debug {tag}", fontsize=16)
+    plt.savefig(os.path.join(args.save_dir,f"phon_projection_debug_{tag}.png"), bbox_inches="tight")
+    plt.close()

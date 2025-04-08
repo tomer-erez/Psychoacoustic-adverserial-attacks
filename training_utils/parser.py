@@ -38,23 +38,26 @@ def create_arg_parser():
 
 
     parser.add_argument('--norm_type', type=str,
-                        choices=["l2","linf","snr","tv","fletcher_munson","min_max_freqs"],
-                        default='fletcher_munson',help='type of norm to limit the perturbation')
+                        choices=["l2", "linf", "snr", "tv", "fletcher_munson", "min_max_freqs", "max_phon"],
+                        default='max_phon',help='type of norm to limit the perturbation')
     #sizes of perturbations
     parser.add_argument('--fm_epsilon', type=float,default=2,help='size of the fm_epsilon perturbation')
     parser.add_argument('--l2_size', type=float,default=0.25,help='size of the l2 perturbation')
     parser.add_argument('--linf_size', type=float,default=0.0001,help='size of the linf perturbation')
-    parser.add_argument('--snr_db', type=int,default=64,help='size of the signal to noise ratio ')
-    parser.add_argument('--min_freq_attack', type=int,default=250,help='min freq to perturb in, remember that the human threshold is ~20 hz')
-    parser.add_argument('--max_freq_attack', type=int,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
+    parser.add_argument('--snr_db', type=float,default=64,help='size of the signal to noise ratio ')
+    parser.add_argument('--min_freq_attack', type=float,default=250,help='min freq to perturb in, remember that the human threshold is ~20 hz')
+    parser.add_argument('--max_freq_attack', type=float,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
     parser.add_argument('--tv_epsilon', type=float,default=0.01,help='Total Variation constraint')
-
+    parser.add_argument('--max_phon_level', type=float, default=0,
+                        help='Maximum allowed phon level in perceptual constraint (e.g., 0 phon = inaudible)')
 
     """sound properties"""
     parser.add_argument('--sr', type=int,default=16000,help='sample rate')
     parser.add_argument('--n_fft', type=int,default=1024,help='numbers of FFT bins for stft')
     parser.add_argument('--hop_length', type=int,default=256,help='for fft')
     parser.add_argument('--win_length', type=int,default=1024,help='for fft')
+    parser.add_argument('--relative_audio_length', type=float,default=0.80,
+                        help='percentile of all audio lengths to use for the perturbation. all audio files will be cropped or padded to this level')
 
     """others"""
     parser.add_argument('--seed', type=int,default=5,help='random seed for reproducibility')

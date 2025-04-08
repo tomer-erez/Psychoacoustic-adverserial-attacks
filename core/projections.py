@@ -1,5 +1,7 @@
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
+from training_utils import save
 
 def project_snr(clean, perturbation, snr_db):
     """
@@ -52,18 +54,14 @@ def project_tv(p, args, clean_audio):
     return p
 
 def project_min_max_freqs(args,stft_p, min_freq, max_freq):
-
     # Get frequencies for STFT bins
     freq_bins = stft_p.shape[-2]
     freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).to(stft_p.device)
-
     # Mask: 1 where freqs < min or freqs > max
     mask = ((freqs < min_freq) | (freqs > max_freq)).float()
     mask = mask.view(1, -1, 1)  # Match (batch, freq, time)
-
     # Apply mask
     stft_p = stft_p * mask
-
     return stft_p
 
 
@@ -111,3 +109,29 @@ def project_fm_norm(stft_p, args, interp):
         return stft_p
     scale = args.fm_epsilon / norm.clamp(min=1e-8)
     return stft_p * scale
+
+
+
+
+def project_phon_level(stft_p, args, spl_thresh, plot_debug=False, tag=""):
+    """
+    Clamps STFT magnitude to be below scaled phon contour threshold.
+    """
+    mag = stft_p.abs()
+    mag_db = 20 * torch.log10(mag + 1e-8)  # convert to dB scale
+
+    # Scale contour to match STFT dynamic range
+    scaled_thresh = spl_thresh - spl_thresh.max() + mag_db.max()
+
+    # Clip
+    exceed_mask = mag_db > scaled_thresh
+    mag_db_clipped = torch.where(exceed_mask, scaled_thresh, mag_db)
+    mag_clipped = 10 ** (mag_db_clipped / 20)
+    stft_p_clipped = mag_clipped * torch.exp(1j * stft_p.angle())
+
+    # 🎨 Plot debug info if requested
+    if plot_debug:
+        save.plot_debug_phon(mag_db=mag_db,mag_db_clipped=mag_db_clipped,scaled_thresh=scaled_thresh,args=args,tag=tag)
+
+    return stft_p_clipped
+

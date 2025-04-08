@@ -6,6 +6,27 @@ from scipy.interpolate import PchipInterpolator, RegularGridInterpolator
 import matplotlib.pyplot as plt
 import torch
 
+"""
+This script is an implementation of 'equal loudness contours'.
+the concept of equal loudness contours is that for different frequency levels, we have different amplitude sensitivity.
+you can briefly read https://en.wikipedia.org/wiki/Equal-loudness_contour
+key terms:
+
+phon: estimation for human percieved loudness. 0 is the lower threshold of hearing,
+60 is about the speech range, 120 is maybe a rock concert, and 150 is painful.
+
+SPL:  physical measurment unit for effective pressure(amplitude) of a sound relative to a reference value.
+
+frequency: self explanatory.
+
+so equal loudness contours are over a map of SPL, frequency, showing for different frequency levels, what SPL level is needed to achieve a phon level X.
+
+for example:
+at frequency 100hz, we need ~25 SPL to achieve 0 phon level of loudness(lower threshold), 
+but at 1000hz, we need ~5 SPL to achieve 0 phon level of loudness(lower threshold), 
+"""
+
+
 
 class ISO226:
     reference = MappingProxyType({

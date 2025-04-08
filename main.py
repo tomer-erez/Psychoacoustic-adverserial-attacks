@@ -14,13 +14,13 @@ if __name__ == '__main__':
     build.create_logger(args=args)
 
     interp = iso.build_weight_interpolator()
+    spl_thresh=build.init_phon_threshold_tensor(args=args)
     train_data_loader, eval_data_loader, test_data_loader, audio_length = build.create_data_loaders(args=args)
     model, processor = build.load_model(args)
-    p = build.init_perturbation(args=args, length=audio_length, interp=interp, first_batch_data=next(iter(train_data_loader))[0])
+    p = build.init_perturbation(spl_thresh=spl_thresh,args=args, length=audio_length, interp=interp, first_batch_data=next(iter(train_data_loader))[0])
     optimizer = build.create_optimizer(args=args, p=p)
-    wer_metric = hf_evaluate.load("wer",experiment_id=str(uuid.uuid4()))
+    wer_metric = hf_evaluate.load(path="wer",experiment_id=str(uuid.uuid4()))
 
-    # Updated to store dicts with "ctc" and "wer"
     train_scores = {"ctc": [], "wer": []}
     eval_scores_clean = {"ctc": [], "wer": []}
     eval_scores_perturbed = {"ctc": [], "wer": []}
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         p, train_ctc, train_wer = train.train_epoch(
             args=args, train_data_loader=train_data_loader, p=p,
             model=model, epoch=epoch, processor=processor,
-            optimizer=optimizer, interp=interp, wer_metric=wer_metric
+            optimizer=optimizer, interp=interp, wer_metric=wer_metric,spl_thresh=spl_thresh
         )
         train_scores["ctc"].append(train_ctc)
         train_scores["wer"].append(train_wer)

@@ -25,6 +25,7 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
         "l2": f"--l2_size {size_value}",
         "linf": f"--linf_size {size_value}",
         "tv": f"--tv_epsilon {size_value}",
+        "max_phon": f"--max_phon_level {size_value}",
     }
 
     # Check if norm type is valid
@@ -79,11 +80,12 @@ def submit_jobs():
 
     norm_ranges = {
         "snr": [],
-        "min_max_freqs": [20,80,120,160],
+        "min_max_freqs": [],
         "fletcher_munson": [],
         "l2": [],
         "linf": [],
-        "tv":[0.005,0.01,0.03,0.06],
+        "tv":[],
+        "max_phon": [0,10,20,30,40],
     }
 
     attack_mode = "untargeted"  # "untargeted" or "targeted"

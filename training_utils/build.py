@@ -4,6 +4,8 @@ import shutil
 import os
 import json
 import random
+
+from sympy import fourier_transform
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH  # Example ASR dataset
@@ -11,7 +13,7 @@ from torch.utils.data import Subset, DataLoader
 from training_utils.train import perturbation_constraint
 import sys
 from datasets import load_dataset, Audio
-
+from core import elc,fourier_transforms
 
 def make_collate_fn(audio_length):
     def collate_fn(batch):
@@ -115,7 +117,7 @@ def create_data_loaders(args):
         args.num_items_to_inspect = 1
     # Estimate fixed waveform length
     sample_lengths = [dataset[i][0].shape[1] for i in indices[:min(200, len(indices))]]
-    audio_length = int(torch.tensor(sample_lengths).float().quantile(0.75).item())
+    audio_length = int(torch.tensor(sample_lengths).float().quantile(args.relative_audio_length).item())
 
     # clip audios to be length
     collate_fn = make_collate_fn(audio_length)
@@ -162,21 +164,23 @@ def create_logger(args):
     or to a log file otherwise.
     """
     # Determine attack size string
-    size = ''
-    if args.norm_type in ["fletcher_munson", "min_max_freqs"]:
-        if args.norm_type == "min_max_freqs":
-            size = f'{args.min_freq_attack}'
-        elif args.norm_type == "fletcher_munson":
-            size = f'{args.fm_epsilon}'
+
+    if args.norm_type == "min_max_freqs":
+        size = f'{args.min_freq_attack}'
+    elif args.norm_type == "fletcher_munson":
+        size = f'{args.fm_epsilon}'
+    elif args.norm_type == "max_phon":
+        size = f'{args.max_phon_level}'
+    elif args.norm_type == "l2":
+        size = f"{args.l2_size}"
+    elif args.norm_type == "linf":
+        size = f"{args.linf_size}"
+    elif args.norm_type == "snr":
+        size = f"{args.snr_db}"
+    elif args.norm_type == "tv":
+        size = f"{args.tv_epsilon}"
     else:
-        if args.norm_type == "l2":
-            size = f"{args.l2_size}"
-        elif args.norm_type == "linf":
-            size = f"{args.linf_size}"
-        elif args.norm_type == "snr":
-            size = f"{args.snr_db}"
-        elif args.norm_type == "tv":
-            size = f"{args.tv_epsilon}"
+        raise ValueError(f"Unsupported norm_type: {args.norm_type}")
     args.attack_size_string = size
 
 
@@ -239,7 +243,7 @@ def create_logger(args):
     sys.stderr.flush()
 
 
-def init_perturbation(args,length,interp,first_batch_data):
+def init_perturbation(args,length,spl_thresh,interp,first_batch_data):
     """
     Initializes a universal perturbation `p` with the same shape as input audio.
     Assumes args.dim = (num_channels, num_samples) or similar.
@@ -252,9 +256,21 @@ def init_perturbation(args,length,interp,first_batch_data):
             raise ValueError(f"Loaded perturbation length {p.shape[-1]} does not match expected length {length}")
     else:
         p = torch.randn(1, length, device=args.device).detach().requires_grad_()
-        p = perturbation_constraint(p=p,clean_audio=first_batch_data,args=args,interp=interp).detach().requires_grad_()
+        if first_batch_data is not None:
+            p = perturbation_constraint(p=p,clean_audio=first_batch_data,args=args,interp=interp,spl_thresh=spl_thresh).detach().requires_grad_()
         p.retain_grad()
+    stft =fourier_transforms.compute_stft(p, args)
+    print(f"the stft shape of your perturbation is: {stft.shape}, as in (1,frequency bins,time frames")
     return p
+
+
+def init_phon_threshold_tensor(args):
+    freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).cpu().numpy()
+    spl_thresh_np = elc.elc(args.max_phon_level, freqs)
+    spl_thresh = torch.tensor(spl_thresh_np, dtype=torch.float32, device=args.device)
+    spl_thresh = spl_thresh.view(1, -1, 1)
+    return spl_thresh
+
 
 
 def create_optimizer(args,p):

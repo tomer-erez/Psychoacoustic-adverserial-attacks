@@ -9,21 +9,22 @@ def avg_scores(scores):
     return sum(scores) / len(scores)
 
 
-def perturbation_constraint(p,clean_audio, args,interp):
+def perturbation_constraint(p,clean_audio, args,interp,spl_thresh):
     """
     Projects the perturbation to the allowed constraint set.
     Assumes input is a Tensor (not a Parameter).
     Applies constraint based on the selected norm type.
     """
     # --- frequency domain norms:
-    if args.norm_type in ["fletcher_munson" ,"min_max_freqs"]:
+    if args.norm_type in ["fletcher_munson" ,"min_max_freqs","max_phon"]:
         p = fourier_transforms.compute_stft(p, args=args)#to freq
 
         if args.norm_type == "min_max_freqs":
             p = projections.project_min_max_freqs(args, stft_p=p,min_freq=args.min_freq_attack,max_freq=args.max_freq_attack)
         elif args.norm_type == "fletcher_munson":
             p = projections.project_fm_norm(stft_p=p, args=args, interp=interp)
-
+        elif args.norm_type == "max_phon":
+            p =projections.project_phon_level(stft_p=p, args=args, spl_thresh=spl_thresh)
         p= fourier_transforms.compute_istft(p, args=args)
 
         if clean_audio is not None:
@@ -34,7 +35,6 @@ def perturbation_constraint(p,clean_audio, args,interp):
             elif p.shape[-1] > clean_audio.shape[-1]:
                 # Crop to match
                 p = p[..., :clean_audio.shape[-1]]
-
     # time domain norms
     else:
         if args.norm_type == "l2":
@@ -52,7 +52,7 @@ def perturbation_constraint(p,clean_audio, args,interp):
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp, wer_metric):
+def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp, wer_metric,spl_thresh):
     ctc_scores, wer_scores, times = [], [], []
     model.eval()
 
@@ -73,7 +73,7 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
         loss, logits = loss_helpers.get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
         ctc_scores.append(loss.item())
 
-        wer = loss_helpers.compute_ctc_and_wer_loss(logits, target_texts, processor, wer_metric)
+        wer = loss_helpers.compute_ctc_and_wer_loss(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
         wer_scores.append(wer)
 
         if args.optimize_type == "pgd":
@@ -81,7 +81,7 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
             with torch.no_grad():
                 step = -args.lr if args.attack_mode == "targeted" else args.lr
                 p = p + step * p.grad.sign()
-                p = perturbation_constraint(p=p, clean_audio=data, args=args, interp=interp)
+                p = perturbation_constraint(p=p, clean_audio=data, args=args, interp=interp,spl_thresh=spl_thresh)
 
             p = p.detach().requires_grad_()
         else:
