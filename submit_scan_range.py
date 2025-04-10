@@ -1,11 +1,11 @@
 import subprocess
 import os
 
-logs_dir='/home/tomer.erez/psychoacoustic_attacks/logs'
+logs_dir='/home/tomer.erez/psychoacoustic_attacks/trash'
 os.makedirs(logs_dir, exist_ok=True)
 
 
-def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None,target_reps=5):
+def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None,target_reps=5,ds="LibreeSpeech"):
     """
     Generate a sbatch job script for a specific norm and size
 
@@ -33,13 +33,13 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
         raise ValueError(f"Unsupported norm type: {norm_type}")
     if size_value is None:
         return
-    name_to_use = f"{norm_type}_{size_value}_{attack_mode}"
+    name_to_use = f"{norm_type}_{size_value}_{ds}_{attack_mode}"
     if attack_mode=="targeted" and target_word is not None:
         name_to_use = f"{name_to_use}_{target_word}"
     # Generate unique filename
-    script_filename = f"{name_to_use}.sh"
+    script_filename = os.path.join(logs_dir, f"{name_to_use}.sh")
 
-    base_args = f"--batch_size 28 --num_epochs 30 --norm_type {norm_type} {size_args[norm_type]}"
+    base_args = f"--batch_size 28 --norm_type {norm_type} {size_args[norm_type]} --dataset {ds}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -55,8 +55,7 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
 #SBATCH --mem=16G
 #SBATCH --job-name={name_to_use}
 #SBATCH --output={logs_dir}/{name_to_use}_%j.out
-#SBATCH --mail-user=tomer.erez@campus.technion.ac.il
-#SBATCH --mail-type=ALL
+#SBATCH --requeue
 
 # === Conda setup ===
 source ~/miniconda3/etc/profile.d/conda.sh
@@ -79,14 +78,16 @@ def submit_jobs():
     """
 
     norm_ranges = {
-        "snr": [],
-        "min_max_freqs": [],
+        "snr": [50],
+        "min_max_freqs": [140],
         "fletcher_munson": [],
         "l2": [],
         "linf": [],
-        "tv":[],
-        "max_phon": [0,10,20,30,40],
+        "tv":[0.004],
+        "max_phon": [24],
     }
+    # tedlium, LibreeSpeech, CommonVoice
+    ds="LibreeSpeech"
 
     attack_mode = "untargeted"  # "untargeted" or "targeted"
     target_words = ["delete"]  # Sweep over these
@@ -110,7 +111,7 @@ def submit_jobs():
                             norm_type, size_value,
                             attack_mode=attack_mode,
                             target_word=target,
-                            target_reps=target_reps
+                            target_reps=target_reps,ds=ds
                         )
 
                         # Submit
@@ -138,9 +139,3 @@ def submit_jobs():
 # Run the job submission
 if __name__ == "__main__":
     submitted_jobs = submit_jobs()
-
-    # Optional: You can do something with the submitted jobs if needed
-    # For example, write to a log file
-    with open('submitted_jobs.log', 'w') as f:
-        for job in submitted_jobs:
-            f.write(f"{job['job_id']}: {job['norm_type']} - {job['size_value']}\n")

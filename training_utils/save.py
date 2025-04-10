@@ -151,6 +151,8 @@ def stft_plot(path, tensor, args, title="STFT Magnitude"):
     plt.savefig(path + "_log.png")
     plt.close()
 
+def save_pert(p,path):
+    torch.save(p.detach().cpu(), path)
 
 def save_by_epoch(args, p,test_data_loader,model, processor,epoch_num):
     save_audio(filename=os.path.join(args.save_dir, "perturbation.wav"), tensor=p)
@@ -218,53 +220,40 @@ def plot_fm_weights(freqs, weights, path="fm_weights.png"):
 
 
 
-def save_json_results(save_dir,
-                      norm_type,
-                      attack_size,
-                      epoch=None,
-                      train_score=None,
-                      eval_score_clean=None,
-                      eval_score_perturbed=None,
-                      best_train_score=None,
-                      best_eval_score=None,
-                      final_test_clean=None,
-                      final_test_perturbed=None):
+
+
+def save_json_results(save_dir, norm_type, attack_size, **kwargs):
     json_path = os.path.join(save_dir, "results.json")
 
     def safe_to_float(v):
-        return {k: float(v[k]) for k in v} if isinstance(v, dict) else float(v)
+        return {k: round(float(v[k]),2) for k in v} if isinstance(v, dict) else float(v)
 
+    # Base fields
     results = {
         "norm_type": norm_type,
         "attack_size": float(attack_size),
     }
 
-    if epoch is not None:
-        results["epoch"] = epoch
-    if train_score is not None:
-        results["train_score"] = safe_to_float(train_score)
-    if eval_score_clean is not None:
-        results["eval_score_clean"] = safe_to_float(eval_score_clean)
-    if eval_score_perturbed is not None:
-        results["eval_score_perturbed"] = safe_to_float(eval_score_perturbed)
-    if best_train_score is not None:
-        results["best_train_score"] = safe_to_float(best_train_score)
-    if best_eval_score is not None:
-        results["best_eval_score"] = safe_to_float(best_eval_score)
-    if final_test_clean is not None:
-        results["test_loss_clean"] = safe_to_float(final_test_clean)
-    if final_test_perturbed is not None:
-        results["test_loss_perturbed"] = safe_to_float(final_test_perturbed)
-        if final_test_clean:
-            if isinstance(final_test_clean, dict):
-                results["perturbation_efficiency"] = {
-                    k: final_test_perturbed[k] / final_test_clean[k] for k in final_test_clean
-                }
-            else:
-                results["perturbation_efficiency"] = final_test_perturbed / final_test_clean
+    # Add all other fields from kwargs if not None
+    for key, val in kwargs.items():
+        if val is not None:
+            results[key] = safe_to_float(val)
 
+    # Optionally compute perturbation efficiency
+    clean = kwargs.get("final_test_clean") or kwargs.get("test_loss_clean")
+    pert = kwargs.get("final_test_perturbed") or kwargs.get("test_loss_perturbed")
+    if clean is not None and pert is not None:
+        if isinstance(clean, dict):
+            results["perturbation_efficiency"] = {
+                k: pert[k] / clean[k] for k in clean
+            }
+        else:
+            results["perturbation_efficiency"] = pert / clean
+
+    # Write to file
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
+
 
 
 def plot_debug_phon(mag_db,mag_db_clipped,scaled_thresh,args,tag):

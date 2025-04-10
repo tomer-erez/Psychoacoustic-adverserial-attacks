@@ -4,8 +4,6 @@ import shutil
 import os
 import json
 import random
-
-from sympy import fourier_transform
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from torch.utils.data import Dataset
 from torchaudio.datasets import LIBRISPEECH  # Example ASR dataset
@@ -14,6 +12,10 @@ from training_utils.train import perturbation_constraint
 import sys
 from datasets import load_dataset, Audio
 from core import elc,fourier_transforms
+
+def flush():
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 def make_collate_fn(audio_length):
     def collate_fn(batch):
@@ -80,23 +82,40 @@ class SafeDatasetWrapper(Dataset):
 
 def create_data_loaders(args):
     """
-    Load and prepare DataLoaders for either LibriSpeech or CommonVoice datasets.
-    Handles fixed-length audio batching without SafeDatasetWrapper.
+    Load and prepare DataLoaders for LibriSpeech, CommonVoice, or TEDLIUM.
+    Enforces a target dataset size early to optimize memory and speed.
     """
     random.seed(args.seed)
+    flush()
+
+    target_size = 24 if args.small_data else 30_000
+    dataset = []
+
+    print(f"loading dataset: {args.dataset}")
 
     if args.dataset == "LibreeSpeech":
-        base_dataset = LIBRISPEECH(
-            root=args.LibriSpeech_path,
-            url="train-clean-100",
-            folder_in_archive="LibriSpeech",
-            download=args.download_ds
-        )
-        dataset = list(base_dataset)  # already returns (waveform, sr, text)
+        splits = ["test-clean", "test-other", "dev-clean", "dev-other"]
+        all_samples = []
+        os.makedirs("librispeech_data", exist_ok=True)
+        for split in splits:
+            ds = LIBRISPEECH(
+                root="librispeech_data",
+                url=split,
+                folder_in_archive="LibriSpeech",
+                download=True
+            )
+            all_samples += list(ds)
+
+        random.shuffle(all_samples)
+        selected = all_samples[:target_size]
+        dataset = [(w, sr, t) for (w, sr, t, *_) in selected]
+        print(f"LibriSpeech subset size: {len(dataset)}")
 
     elif args.dataset == "CommonVoice":
-        data_split = "test[:1%]" if args.small_data else "test" #test is about 16k samples
+        data_split = "train"  # always use train for size, we'll subselect
         base_dataset = load_dataset("mozilla-foundation/common_voice_13_0", "en", split=data_split, trust_remote_code=True)
+        base_dataset = base_dataset.shuffle(seed=args.seed)
+        base_dataset = base_dataset.select(range(min(target_size, len(base_dataset))))  # buffer for filtering
         base_dataset = base_dataset.cast_column("audio", Audio(sampling_rate=16_000))
 
         def to_tuple(example):
@@ -104,24 +123,56 @@ def create_data_loaders(args):
             sample_rate = example["audio"]["sampling_rate"]
             transcript = example["sentence"]
             return waveform, sample_rate, transcript
+
+        print("Mapping CommonVoice...")
         dataset = list(map(to_tuple, base_dataset))
+        print(f"Mapped CommonVoice: {len(dataset)}")
+
+    elif args.dataset == "tedlium":
+        data_split = "train"
+        base_dataset = load_dataset("sanchit-gandhi/tedlium-data", split=data_split, trust_remote_code=True)
+        base_dataset = base_dataset.shuffle(seed=args.seed)
+        base_dataset = base_dataset.select(range(min(target_size, len(base_dataset))))  # buffer for filtering
+        base_dataset = base_dataset.cast_column("audio", Audio(sampling_rate=16_000))
+
+        def to_tuple(example):
+            waveform = torch.tensor(example["audio"]["array"]).unsqueeze(0)
+            sample_rate = example["audio"]["sampling_rate"]
+            transcript = example["text"]
+            return waveform, sample_rate, transcript
+
+        print("Mapping TEDLIUM...")
+        dataset = list(map(to_tuple, base_dataset))
+        print(f"Mapped TEDLIUM: {len(dataset)}")
+
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset}")
 
-    # Shuffle and optionally reduce
+    flush()
+
+    # Optional truncation again (after filtering)
+    if args.small_data:
+        args.num_items_to_inspect = 1
+
+    # Measure lengths
+    sample_lengths = [x[0].shape[1] for x in dataset[:min(300, len(dataset))]]
+    sample_lengths_tensor = torch.tensor(sample_lengths, dtype=torch.float32)
+    min_len = int(sample_lengths_tensor.quantile(0.10).item())
+    audio_length = int(sample_lengths_tensor.quantile(args.relative_audio_length).item())
+
+    print("Filtering dataset by audio length...")
+    dataset = [(w, sr, t) for (w, sr, t) in dataset if min_len <= w.shape[1] <= audio_length]
+    dataset = dataset[:target_size]
+
+    print(f"Filtered dataset size: {len(dataset)}")
+    print(f"Kept samples in range: [{min_len}, {audio_length}], "
+          f"seconds [{min_len/args.sr:.1f}, {audio_length/args.sr:.1f}]")
+
     indices = list(range(len(dataset)))
     random.shuffle(indices)
-
-    if args.small_data:
-        indices = indices[:20]
-        args.num_items_to_inspect = 1
-    # Estimate fixed waveform length
-    sample_lengths = [dataset[i][0].shape[1] for i in indices[:min(200, len(indices))]]
-    audio_length = int(torch.tensor(sample_lengths).float().quantile(args.relative_audio_length).item())
-
-    # clip audios to be length
     collate_fn = make_collate_fn(audio_length)
 
+    # Split
     num_train = int(0.8 * len(indices))
     num_eval = int(0.1 * len(indices))
 
@@ -129,23 +180,22 @@ def create_data_loaders(args):
     eval_subset = Subset(dataset, indices[num_train:num_train + num_eval])
     test_subset = Subset(dataset, indices[num_train + num_eval:])
 
+    # Loaders
     train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     eval_loader = DataLoader(eval_subset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
     test_loader = DataLoader(test_subset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
 
-    print(f"training size: {len(train_loader) * args.batch_size}\t"
-          f"eval size: {len(eval_loader) * args.batch_size}\t"
-          f"test size: {len(test_loader) * args.batch_size}\t"
-          f"audio length: {audio_length}")
+    print(f"Train size: {len(train_loader)*args.batch_size}, "
+          f"Eval size: {len(eval_loader)*args.batch_size}, "
+          f"Test size: {len(test_loader)*args.batch_size}, "
+          f"Target length: {audio_length} samples")
 
     return train_loader, eval_loader, test_loader, audio_length
 
 
 def get_model_size_gb(model):
-    total_params = sum(p.numel() for p in model.parameters())
     param_size_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
     buffer_size_bytes = sum(b.numel() * b.element_size() for b in model.buffers())
-
     total_size_gb = (param_size_bytes + buffer_size_bytes) / (1024 ** 3)
     return total_size_gb
 
@@ -187,10 +237,13 @@ def create_logger(args):
     # Set save_dir and log_file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     all_logs_dir = os.path.join(os.path.dirname(current_dir), "logs")
-    args.save_dir = os.path.join(all_logs_dir, args.attack_mode, f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
+    args.save_dir = os.path.join(all_logs_dir, args.attack_mode,args.dataset,f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
+    args.tensorboard_logger = os.path.join(all_logs_dir, 'tensor_board_log_dir')
+    os.makedirs(args.save_dir, exist_ok=True)
     args.was_preempted=False
     args.had_checkpoint=False
 
+    os.makedirs(args.save_dir, exist_ok=True)
     os.makedirs(args.save_dir, exist_ok=True)
 
     args.log_file = os.path.join(args.save_dir, 'train_log.txt')
@@ -202,17 +255,13 @@ def create_logger(args):
         perturbation_path = os.path.join(args.save_dir, "perturbation.pt")
 
 
-        if os.path.exists(perturbation_path):
+        if (os.path.exists(perturbation_path)) and (not args.small_data):
             args.had_checkpoint = True
             args.resume = True
             args.resume_from = perturbation_path
             x = f"this job was preempted and has a checkpoint in {args.resume_from}\n"
-            if args.small_data:
-                print(x)
-            else:
-                with open(args.log_file, 'w') as f:
-                    f.write(x)
-
+            with open(args.log_file, 'w') as f:
+                f.write(x)
         else:
             with open(args.log_file, 'w') as f:
                 f.write("this job was preempted but has no checkpoint, so we are training it from scratch\n")
@@ -259,8 +308,10 @@ def init_perturbation(args,length,spl_thresh,interp,first_batch_data):
         if first_batch_data is not None:
             p = perturbation_constraint(p=p,clean_audio=first_batch_data,args=args,interp=interp,spl_thresh=spl_thresh).detach().requires_grad_()
         p.retain_grad()
-    stft =fourier_transforms.compute_stft(p, args)
-    print(f"the stft shape of your perturbation is: {stft.shape}, as in (1,frequency bins,time frames")
+    print(f"the waveform shape of the perturbation is :{p.shape}, as in (1,sr*time)\n"
+          f"the stft shape of the perturbation is: {fourier_transforms.compute_stft(p, args).shape}, as in (1,frequency bins,time frames)\n")
+
+
     return p
 
 

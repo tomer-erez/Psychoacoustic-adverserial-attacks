@@ -73,7 +73,7 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
         loss, logits = loss_helpers.get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
         ctc_scores.append(loss.item())
 
-        wer = loss_helpers.compute_ctc_and_wer_loss(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
+        wer = loss_helpers.compute_wer_loss(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
         wer_scores.append(wer)
 
         if args.optimize_type == "pgd":

@@ -120,16 +120,17 @@ def project_phon_level(stft_p, args, spl_thresh, plot_debug=False, tag=""):
     mag = stft_p.abs()
     mag_db = 20 * torch.log10(mag + 1e-8)  # convert to dB scale
 
-    # Scale contour to match STFT dynamic range
-    scaled_thresh = spl_thresh - spl_thresh.max() + mag_db.max()
+    # Scale the phon contour to match a fixed perceptual loudness level
+    # e.g., 40 dB in STFT space = 0 phon (threshold of hearing)
+    scaled_thresh = spl_thresh - spl_thresh.max() + args.phon_reference_db
 
-    # Clip
+    # Clip STFT magnitudes that exceed the scaled contour
     exceed_mask = mag_db > scaled_thresh
     mag_db_clipped = torch.where(exceed_mask, scaled_thresh, mag_db)
     mag_clipped = 10 ** (mag_db_clipped / 20)
     stft_p_clipped = mag_clipped * torch.exp(1j * stft_p.angle())
 
-    # 🎨 Plot debug info if requested
+    # Plot debug info if requested
     if plot_debug:
         save.plot_debug_phon(mag_db=mag_db,mag_db_clipped=mag_db_clipped,scaled_thresh=scaled_thresh,args=args,tag=tag)
 

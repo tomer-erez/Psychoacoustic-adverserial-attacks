@@ -4,12 +4,14 @@ from core import iso
 from training_utils import evaluation, train, parser, save, log_helpers, build
 import evaluate as hf_evaluate
 import uuid
+from training_utils import tensor_board_logging
 
 
+def scores(ctc, wer):
+    return {"ctc": ctc, "wer": wer}
 
 
-if __name__ == '__main__':
-    args = parser.create_arg_parser().parse_args()
+def main(args):
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
     build.create_logger(args=args)
 
@@ -28,8 +30,8 @@ if __name__ == '__main__':
     no_improve_epochs = 0
     best_eval_score_perturbed = float('inf') if args.attack_mode == "targeted" else float('-inf')
 
+    finished_training =False
     for epoch in range(args.num_epochs):
-
         ############################################# train epoch on perturbation
         p, train_ctc, train_wer = train.train_epoch(
             args=args, train_data_loader=train_data_loader, p=p,
@@ -69,16 +71,17 @@ if __name__ == '__main__':
 
 
 
-        save.save_by_epoch(args=args, p=p, test_data_loader=test_data_loader,model=model,
-                           processor=processor, epoch_num=epoch)
+
 
         save.save_loss_plot(train_scores=train_scores,eval_scores_perturbed=eval_scores_perturbed,eval_scores_clean=eval_scores_clean,
                             save_dir=args.save_dir,norm_type=args.norm_type)
 
         save.save_json_results(
-            save_dir=args.save_dir, norm_type=args.norm_type,attack_size=args.attack_size_string, epoch=epoch,
-            train_score={"ctc": train_ctc, "wer": train_wer},eval_score_clean={"ctc": eval_ctc_clean, "wer": eval_wer_clean},
-            eval_score_perturbed={"ctc": eval_ctc_perturbed, "wer": eval_wer_perturbed}
+            save_dir=args.save_dir, norm_type=args.norm_type,attack_size=args.attack_size_string,
+            epoch=epoch,finished_training=finished_training,
+            eval_score_clean=scores(eval_ctc_clean,eval_wer_clean)
+            ,eval_score_perturbed=scores(eval_ctc_perturbed,eval_wer_perturbed),
+            train_score=scores(train_ctc,train_wer),
         )
 
         #early stopping/save epoch and continue
@@ -86,13 +89,18 @@ if __name__ == '__main__':
         if (args.attack_mode == "targeted" and current_metric < best_eval_score_perturbed) or \
            (args.attack_mode == "untargeted" and current_metric > best_eval_score_perturbed):
             no_improve_epochs, best_eval_score_perturbed = 0, current_metric
-            torch.save(p.detach().cpu(), os.path.join(args.save_dir, f"perturbation.pt"))
+            save.save_pert(p=p,path=os.path.join(args.save_dir, f"perturbation.pt"))
+            save.save_by_epoch(args=args, p=p, test_data_loader=test_data_loader, model=model,
+                               processor=processor, epoch_num=epoch)
         else:
             no_improve_epochs += 1
-        if no_improve_epochs > args.early_stopping:
+        if no_improve_epochs == args.early_stopping:
             print(f'No improvements in {no_improve_epochs} epochs. Stopping early.')
             break
 
+    #== == == == == == == == == == 🏁 FINALIZE TRAINING 🏁 == == == == == == == == == ==
+
+    finished_training=True
     # Final test evaluation
     pert_ctc_test, pert_wer_test = evaluation.evaluate( #test the perturbation
         args=args, eval_data_loader=test_data_loader, p=p,
@@ -111,8 +119,9 @@ if __name__ == '__main__':
         eval_scores_perturbed=eval_scores_perturbed,
         save_dir=args.save_dir,
         norm_type=args.norm_type,
-        clean_test_loss={"ctc": clean_ctc_test, "wer": clean_wer_test},
-        perturbed_test_loss={"ctc": pert_ctc_test, "wer": pert_wer_test}
+        clean_test_loss=scores(clean_ctc_test, clean_wer_test),
+        perturbed_test_loss=scores(pert_ctc_test, pert_wer_test)
+
     )
 
     if args.attack_mode == "targeted":
@@ -123,16 +132,29 @@ if __name__ == '__main__':
         best_train_wer = max(train_scores["wer"])
 
     save.save_json_results( # save the result to a json file, easier to later parse and loop over all train logs
-        save_dir=args.save_dir,
+        save_dir=args.save_dir,epoch=epoch,finished_training=finished_training,
         norm_type=args.norm_type,
         attack_size=args.attack_size_string,
-        train_score={"ctc": train_scores["ctc"][-1], "wer": train_scores["wer"][-1]},
-        best_train_score={"ctc": best_train_ctc, "wer": best_train_wer},
-        eval_score_clean={"ctc": clean_ctc_test, "wer": clean_wer_test},
-        eval_score_perturbed={"ctc": pert_ctc_test, "wer": pert_wer_test},
-        final_test_clean={"ctc": clean_ctc_test, "wer": clean_wer_test},
-        final_test_perturbed={"ctc": pert_ctc_test, "wer": pert_wer_test}
+        best_train_score=scores(best_train_ctc, best_train_wer),
+        eval_score_clean=scores(clean_ctc_test, clean_wer_test),
+        eval_score_perturbed=scores(pert_ctc_test, pert_wer_test),
+        final_test_clean=scores(clean_ctc_test, clean_wer_test),
+        final_test_perturbed=scores(pert_ctc_test, pert_wer_test)
     )
+    tensor_board_logging.log_experiment_to_tensorboard(
+        save_dir=args.tensorboard_logger,
+        norm_type=args.norm_type,
+        lr=args.lr,
+        norm_size=args.attack_size_string,
+        dataset=args.dataset,
+        num_epochs=epoch + 1,
+        finished_training=finished_training,
+        perturbed_test_result=scores(pert_ctc_test, pert_wer_test),
+        clean_test_result=scores(clean_ctc_test, clean_wer_test),
+        attack_mode=args.attack_mode,
+        target=args.target if hasattr(args, "target") else None
+    )
+
 
     log_helpers.log_summary_metrics( # log the important stuff from the training process
     args=args,
@@ -144,3 +166,8 @@ if __name__ == '__main__':
     pert_ctc_test=pert_ctc_test,
     pert_wer_test=pert_wer_test
     )
+
+
+if __name__ == '__main__':
+    args = parser.create_arg_parser().parse_args()
+    main(args=args)

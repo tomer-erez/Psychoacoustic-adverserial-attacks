@@ -1,10 +1,23 @@
-
-
 # Psychoacoustic Adversarial Attacks on speech recognition models
 
-This project explores adversarial attacks on automatic speech recognition (ASR) models, with a focus on crafting **perturbations that are difficult for humans to perceive** but significantly degrade model performance.
+This project explores adversarial attacks on automatic speech recognition (ASR) models, 
+with a focus on crafting **perturbations that are difficult for humans to perceive** but significantly degrade model performance.
 
-We investigate how different norm types (e.g., L2, Linf, perceptual/Fletcher-Munson weighted) and perturbation sizes affect both the model's predictions and the human perceptibility of the perturbation. Our goal is to develop attacks that are **effective yet stealthy** — confusing the model while remaining inaudible to the human ear.
+We investigate how different norm types (e.g., L2, Linf, equal loudness contours) 
+and perturbation sizes affect both the model's predictions and the human perceptibility of the perturbation. 
+Our goal is to develop attacks that are **effective yet stealthy** — confusing the model while remaining inaudible to the human ear.
+
+targeted(encourage a malicious command, e.g. "delete all files") and untargeted attacks can be run.
+
+---
+
+
+## 🎧 attack settings
+
+attacking the Wav2vec2 model by meta, which was trained on libreelight and libreespeech.
+
+supporting attacks vs the test set of libreespeech, CommonVoice, Tedlium.
+
 
 ---
 
@@ -29,14 +42,6 @@ python main.py
 
 You can specify various command-line arguments to control the attack (see **Hyperparameters** below).
 
----
-
-## 🎧 Dataset: Common Voice
-
-The project uses the [Common Voice](https://huggingface.co/datasets/mozilla-foundation/common_voice_11_0) dataset. The script will automatically download it on first run.
-
-If prompted, you may need to authenticate with your Hugging Face account. You can do this by visiting:  
-https://huggingface.co/settings/tokens
 
 ---
 
@@ -68,12 +73,7 @@ You can control the behavior of the attack using the following command-line argu
 Here's how to run a targeted Fletcher-Munson attack for 5 epochs:
 
 ```bash
-python main.py \
-  --attack_mode targeted \
-  --target "delete" \
-  --norm_type fletcher_munson \
-  --fm_epsilon 2.0 \
-  --num_epochs 5
+python main.py --attack_mode targeted --target "delete" --norm_type snr --snr_db 35 
 ```
 
 Or a debug run with minimal data:
@@ -82,19 +82,34 @@ Or a debug run with minimal data:
 python main.py --small_data --norm_type linf --linf_size 0.0002
 ```
 
-### Hidden attacks:
+### Hidden attack Results:
 
-according to some local testing here is each norm's size for a hidden attack:
+**Metric**: Word Error Rate (WER), based on edit distance between predicted and reference transcripts.
 
-| norm                | size            |
-|---------------------|-----------------|
-| `--fm_epsilon`      | 2 or lower      |
-| `--l2_size`         | 0.35 or lower   |
-| `--linf_size`       | 0.0001 or lower |
-| `--snr_db`          | 64 or higher    |
-| `--min_freq_attack` | 250 or lower    |
-| `--max_phon_level`  | 85 or lower     |
-| `--tv_epsilon`      | 0.001 or lower  |
+a standard metric for evaluating Automatic Speech Recognition (ASR) systems. It quantifies the difference between the predicted transcript and the ground truth using edit distance:
+
+WER = (S + D + I) / N
+
+Where:
+- **S**: Number of substitutions  
+- **D**: Number of deletions  
+- **I**: Number of insertions  
+- **N**: Total number of words in the reference transcript  
+
+A **higher WER** after applying perturbations indicates that the ASR model is more confused by the audio, which is the goal in adversarial settings. The **clean WER** serves as a baseline, and the **perturbed WER** shows the impact of the attack under different imperceptibility constraints.
+
+**Task**: Un-targeted hidden attacks on the union of LibriSpeech test-clean, test-other, dev-clean, dev-other
+set using various imperceptibility constraints.
+
+| Constraint (`norm`)     | Value    | Clean WER (%) | Perturbed WER (%) |
+|--------------------------|----------|----------------|--------------------|
+| `--fm`                   | -        | 4.1            | 38.5               |
+| `--l2`                   | 0.1      | 4.1            | 45.2               |
+| `--linf`                 | 0.0001   | 4.1            | 32.8               |
+| `--snr`                  | 64       | 4.1            | 27.4               |
+| `--min_freq_attack`      | 120 Hz   | 4.1            | 22.3               |
+| `--max_phon`             | 25       | 4.1            | 19.7               |
+| `--tv`                   | 0.001    | 4.1            | 35.1               |
 
 
 

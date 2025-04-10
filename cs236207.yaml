@@ -22,5 +22,5 @@ dependencies:
       - transformers
       - evaluate
       - jiwer
-      - git+https://github.com/fra31/auto-attack
-      - git+https://github.com/RobustBench/robustbench.git
+      - tensorboard
+      - numpy<=2.1
