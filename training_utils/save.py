@@ -226,7 +226,7 @@ def save_json_results(save_dir, norm_type, attack_size, **kwargs):
     json_path = os.path.join(save_dir, "results.json")
 
     def safe_to_float(v):
-        return {k: round(float(v[k]),2) for k in v} if isinstance(v, dict) else float(v)
+        return {k: round(float(v[k]),4) for k in v} if isinstance(v, dict) else float(v)
 
     # Base fields
     results = {

@@ -1,6 +1,7 @@
 import torch
 import torch.optim as optim
 import shutil
+from torch.nn import Parameter
 import os
 import json
 import random
@@ -89,7 +90,6 @@ def create_data_loaders(args):
     flush()
 
     target_size = 24 if args.small_data else 30_000
-    dataset = []
 
     print(f"loading dataset: {args.dataset}")
 
@@ -109,7 +109,6 @@ def create_data_loaders(args):
         random.shuffle(all_samples)
         selected = all_samples[:target_size]
         dataset = [(w, sr, t) for (w, sr, t, *_) in selected]
-        print(f"LibriSpeech subset size: {len(dataset)}")
 
     elif args.dataset == "CommonVoice":
         data_split = "train"  # always use train for size, we'll subselect
@@ -124,9 +123,7 @@ def create_data_loaders(args):
             transcript = example["sentence"]
             return waveform, sample_rate, transcript
 
-        print("Mapping CommonVoice...")
         dataset = list(map(to_tuple, base_dataset))
-        print(f"Mapped CommonVoice: {len(dataset)}")
 
     elif args.dataset == "tedlium":
         data_split = "train"
@@ -141,9 +138,22 @@ def create_data_loaders(args):
             transcript = example["text"]
             return waveform, sample_rate, transcript
 
-        print("Mapping TEDLIUM...")
         dataset = list(map(to_tuple, base_dataset))
-        print(f"Mapped TEDLIUM: {len(dataset)}")
+
+    # elif args.dataset == "speech_commands":
+    #     data_split = "train"  # or "validation" / "test" for evaluation only
+    #     base_dataset = load_dataset("speech_commands", split=data_split)
+    #     base_dataset = base_dataset.shuffle(seed=args.seed)
+    #     base_dataset = base_dataset.select(range(min(target_size, len(base_dataset))))
+    #     base_dataset = base_dataset.cast_column("audio", Audio(sampling_rate=16_000))
+    #
+    #     def to_tuple(example):
+    #         waveform = torch.tensor(example["audio"]["array"]).unsqueeze(0)
+    #         sample_rate = example["audio"]["sampling_rate"]
+    #         transcript = example["label"]
+    #         return waveform, sample_rate, transcript
+    #
+    #     dataset = list(map(to_tuple, base_dataset))
 
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset}")
@@ -160,7 +170,6 @@ def create_data_loaders(args):
     min_len = int(sample_lengths_tensor.quantile(0.10).item())
     audio_length = int(sample_lengths_tensor.quantile(args.relative_audio_length).item())
 
-    print("Filtering dataset by audio length...")
     dataset = [(w, sr, t) for (w, sr, t) in dataset if min_len <= w.shape[1] <= audio_length]
     dataset = dataset[:target_size]
 
@@ -188,7 +197,7 @@ def create_data_loaders(args):
     print(f"Train size: {len(train_loader)*args.batch_size}, "
           f"Eval size: {len(eval_loader)*args.batch_size}, "
           f"Test size: {len(test_loader)*args.batch_size}, "
-          f"Target length: {audio_length} samples")
+          )
 
     return train_loader, eval_loader, test_loader, audio_length
 
@@ -237,7 +246,7 @@ def create_logger(args):
     # Set save_dir and log_file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     all_logs_dir = os.path.join(os.path.dirname(current_dir), "logs")
-    args.save_dir = os.path.join(all_logs_dir, args.attack_mode,args.dataset,f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}")
+    args.save_dir = os.path.join(all_logs_dir, args.attack_mode,args.dataset,f"{args.norm_type}_{args.attack_size_string}_{args.attack_mode}_{args.optimizer_type}")
     args.tensorboard_logger = os.path.join(all_logs_dir, 'tensor_board_log_dir')
     os.makedirs(args.save_dir, exist_ok=True)
     args.was_preempted=False
@@ -248,12 +257,12 @@ def create_logger(args):
 
     args.log_file = os.path.join(args.save_dir, 'train_log.txt')
 
+    chkpt_epoch = 0
 
     if os.path.exists(args.save_dir):
         print('was preempted or save directory already existed')
         args.was_preempted = True
         perturbation_path = os.path.join(args.save_dir, "perturbation.pt")
-
 
         if (os.path.exists(perturbation_path)) and (not args.small_data):
             args.had_checkpoint = True
@@ -262,6 +271,15 @@ def create_logger(args):
             x = f"this job was preempted and has a checkpoint in {args.resume_from}\n"
             with open(args.log_file, 'w') as f:
                 f.write(x)
+            results_path = os.path.join(args.save_dir, "results.json")
+            if os.path.exists(results_path):
+                try:
+                    with open(results_path, 'r') as f:
+                        results = json.load(f)
+                        chkpt_epoch = int(results.get("epoch", 0))
+                except Exception as e:
+                    print(f"Failed to read results.json: {e}")
+
         else:
             with open(args.log_file, 'w') as f:
                 f.write("this job was preempted but has no checkpoint, so we are training it from scratch\n")
@@ -288,9 +306,12 @@ def create_logger(args):
     print("========================")
 
     print(f"\nnorm type: {args.norm_type}, attack size: {args.attack_size_string}")
+    if chkpt_epoch>0:
+        print(f"resuming checkpoint from epoch: {chkpt_epoch}")
+
     sys.stdout.flush()
     sys.stderr.flush()
-
+    return chkpt_epoch
 
 def init_perturbation(args,length,spl_thresh,interp,first_batch_data):
     """
@@ -299,19 +320,31 @@ def init_perturbation(args,length,spl_thresh,interp,first_batch_data):
     """
     if args.resume_from is not None and os.path.isfile(args.resume_from):
         print(f"Resuming perturbation from checkpoint: {args.resume_from}")
-        loaded = torch.load(args.resume_from, map_location=args.device)
-        p = loaded.detach().to(args.device).requires_grad_()
+        if args.optimizer_type=="pgd":
+            loaded = torch.load(args.resume_from, map_location=args.device)
+            p = loaded.detach().to(args.device).requires_grad_()
+        elif args.optimizer_type=="adam":
+            loaded = torch.load(args.resume_from, map_location=args.device)
+            p = Parameter(loaded.to(args.device))
+        else:
+            raise NotImplementedError(f"Unsupported optimizer_type: {args.optimizer_type}")
         if p.shape[-1] != length:
             raise ValueError(f"Loaded perturbation length {p.shape[-1]} does not match expected length {length}")
+
     else:
-        p = torch.randn(1, length, device=args.device).detach().requires_grad_()
-        if first_batch_data is not None:
-            p = perturbation_constraint(p=p,clean_audio=first_batch_data,args=args,interp=interp,spl_thresh=spl_thresh).detach().requires_grad_()
-        p.retain_grad()
+        p = torch.randn(1, length, device=args.device)
+        p = perturbation_constraint(p=p, clean_audio=first_batch_data, args=args, interp=interp,
+                                    spl_thresh=spl_thresh).detach().requires_grad_()
+        if args.optimizer_type=="pgd":
+            p = p.detach().requires_grad_()
+            p.retain_grad()
+        elif args.optimizer_type=="adam":
+            p = Parameter(p)
+        else:
+            raise NotImplementedError(f"Unsupported optimizer_type: {args.optimizer_type}")
+
     print(f"the waveform shape of the perturbation is :{p.shape}, as in (1,sr*time)\n"
           f"the stft shape of the perturbation is: {fourier_transforms.compute_stft(p, args).shape}, as in (1,frequency bins,time frames)\n")
-
-
     return p
 
 
@@ -325,6 +358,8 @@ def init_phon_threshold_tensor(args):
 
 
 def create_optimizer(args,p):
-    if args.optimize_type!='pgd':
-        return optim.Adam([p], lr=args.lr)
-    return None
+    o,s=None,None
+    if args.optimizer_type=="adam":
+        o = torch.optim.Adam([p], lr=args.lr)
+        s = torch.optim.lr_scheduler.StepLR(o, step_size=args.step_size, gamma=args.gamma)
+    return o,s

@@ -5,7 +5,7 @@ logs_dir='/home/tomer.erez/psychoacoustic_attacks/trash'
 os.makedirs(logs_dir, exist_ok=True)
 
 
-def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None,target_reps=5,ds="LibreeSpeech"):
+def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None,target_reps=5,ds="LibreeSpeech",opt_type="adam"):
     """
     Generate a sbatch job script for a specific norm and size
 
@@ -33,13 +33,13 @@ def generate_sbatch_job(norm_type, size_value,attack_mode=None, target_word=None
         raise ValueError(f"Unsupported norm type: {norm_type}")
     if size_value is None:
         return
-    name_to_use = f"{norm_type}_{size_value}_{ds}_{attack_mode}"
+    name_to_use = f"{norm_type}_{size_value}_{ds}_{attack_mode}_{opt_type}"
     if attack_mode=="targeted" and target_word is not None:
         name_to_use = f"{name_to_use}_{target_word}"
     # Generate unique filename
     script_filename = os.path.join(logs_dir, f"{name_to_use}.sh")
 
-    base_args = f"--batch_size 28 --norm_type {norm_type} {size_args[norm_type]} --dataset {ds}"
+    base_args = f"--batch_size 30 --norm_type {norm_type} {size_args[norm_type]} --dataset {ds} --optimizer_type {opt_type}"
 
 
     safe_target = target_word.replace(" ", "_") if target_word else "none"
@@ -78,16 +78,17 @@ def submit_jobs():
     """
 
     norm_ranges = {
-        "snr": [50],
-        "min_max_freqs": [140],
+        "snr": [60,65],
+        "min_max_freqs": [100,125],
         "fletcher_munson": [],
-        "l2": [],
+        "l2": [0.04,0.06,0.08],
         "linf": [],
-        "tv":[0.004],
-        "max_phon": [24],
+        "tv":[0.001,0.002],
+        "max_phon": [15,20,25,30,35],
     }
     # tedlium, LibreeSpeech, CommonVoice
     ds="LibreeSpeech"
+    opt_type="pgd"
 
     attack_mode = "untargeted"  # "untargeted" or "targeted"
     target_words = ["delete"]  # Sweep over these
@@ -111,7 +112,8 @@ def submit_jobs():
                             norm_type, size_value,
                             attack_mode=attack_mode,
                             target_word=target,
-                            target_reps=target_reps,ds=ds
+                            target_reps=target_reps,ds=ds,
+                            opt_type=opt_type
                         )
 
                         # Submit

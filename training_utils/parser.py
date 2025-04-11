@@ -10,12 +10,14 @@ def create_arg_parser():
     parser.add_argument('--lr', type=float,default=1e-4,help='lr for the perturbation update')
     parser.add_argument('--early_stopping', type=int,default=4,help='how many epochs to wait before early stopping')
     parser.add_argument('--num_epochs', type=int,default=50,help='how many epochs at all')
-    parser.add_argument('--optimize_type', type=str,
+    parser.add_argument('--optimizer_type', type=str,
                         choices=["adam","pgd"],
-                        default='pgd',help='how to optimize the perturbation update')
-    parser.add_argument('--download_ds', action='store_true',
-                        help='If set, download the whole dataset and cache it')
-    parser.add_argument('--dataset', type=str,default="tedlium",
+                        default='adam',help='how to optimize the perturbation update')
+    parser.add_argument('--gamma', type=float,default=0.9,help='weight decay')
+    parser.add_argument('--step_size', type=int,default=2,help='how many epochs does it take before we decay weights')
+
+
+    parser.add_argument('--dataset', type=str,default="LibreeSpeech",
                         choices=["LibreeSpeech","CommonVoice","tedlium"],
                         help='you better use CommonVoice or tedlium if you attack wav2vec2 because its trained on Libreespeech')
 
@@ -40,7 +42,7 @@ def create_arg_parser():
     parser.add_argument('--l2_size', type=float,default=0.05,help='size of the l2 perturbation')
     parser.add_argument('--linf_size', type=float,default=0.0001,help='size of the linf perturbation')
     parser.add_argument('--snr_db', type=float,default=64,help='size of the signal to noise ratio ')
-    parser.add_argument('--min_freq_attack', type=float,default=110,help='min freq to perturb in, remember that the human threshold is ~20 hz')
+    parser.add_argument('--min_freq_attack', type=float,default=120,help='min freq to perturb in, remember that the human threshold is ~20 hz')
     parser.add_argument('--max_freq_attack', type=float,default=20_000,help='max freq to perturb in, remember that the human threshold is ~20000 hz')
     parser.add_argument('--tv_epsilon', type=float,default=0.001,help='Total Variation constraint')
     parser.add_argument('--max_phon_level', type=float, default=20,

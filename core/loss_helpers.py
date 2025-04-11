@@ -19,7 +19,7 @@ def get_loss_for_training(model, data, target_texts, processor, args):
     # print("loss: ", outputs.loss.item())
     return outputs.loss, outputs.logits
 
-def compute_wer_loss(logits, target_texts, processor, wer_metric):
+def compute_wer(logits, target_texts, processor, wer_metric):
     pred_ids = torch.argmax(logits, dim=-1)
     pred_texts = processor.batch_decode(pred_ids, skip_special_tokens=True)
     pred_texts = [p.strip().lower() for p in pred_texts]

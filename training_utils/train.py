@@ -52,7 +52,7 @@ def perturbation_constraint(p,clean_audio, args,interp,spl_thresh):
 
 
 
-def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, interp, wer_metric,spl_thresh):
+def train_epoch(args, train_data_loader, p, model, epoch, processor, interp, wer_metric,spl_thresh,optimizer):
     ctc_scores, wer_scores, times = [], [], []
     model.eval()
 
@@ -60,35 +60,43 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, optimizer, 
     print(f'timestamp: {datetime.now()}\tstarting epoch: {epoch}')
 
     total_batches = len(train_data_loader)
-    report_points = set([int(r * total_batches) for r in [0.0, 0.2, 0.4, 0.6, 0.8, 1]])
+    report_points = set([int(r * total_batches) for r in [0.0, 0.25, 0.50, 0.75, 1]])
+    direction = -1 if args.attack_mode == "untargeted" else 1
 
-    for batch_idx, (data, target_texts) in enumerate(train_data_loader):
+    for batch_idx, (clean_audio, target_texts) in enumerate(train_data_loader):
         a = time.time()
+        # Prepare audio + perturbation
+        clean_audio = clean_audio.to(args.device)
 
-        data = data.to(args.device)
-        data.requires_grad = False
+        clean_audio.requires_grad = False
         p.requires_grad_()
-        data = data + p
+        perturbed_data = clean_audio + p
 
-        loss, logits = loss_helpers.get_loss_for_training(model=model, data=data, target_texts=target_texts, processor=processor, args=args)
+        # Forward pass + compute loss
+        loss, logits = loss_helpers.get_loss_for_training(model=model, data=perturbed_data, target_texts=target_texts, processor=processor, args=args)
         ctc_scores.append(loss.item())
 
-        wer = loss_helpers.compute_wer_loss(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
+        #compute wer
+        wer = loss_helpers.compute_wer(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
         wer_scores.append(wer)
 
-        if args.optimize_type == "pgd":
-            loss.backward()
+        if args.optimizer_type == "pgd":
+            (direction * loss).backward()
             with torch.no_grad():
-                step = -args.lr if args.attack_mode == "targeted" else args.lr
-                p = p + step * p.grad.sign()
-                p = perturbation_constraint(p=p, clean_audio=data, args=args, interp=interp,spl_thresh=spl_thresh)
-
+                p = p + direction * args.lr * p.grad.sign()
+                p = perturbation_constraint(p=p, clean_audio=clean_audio, args=args, interp=interp,spl_thresh=spl_thresh)
             p = p.detach().requires_grad_()
+
+        elif args.optimizer_type == "adam":
+            optimizer.zero_grad()
+            (direction * loss).backward()
+            optimizer.step()
+            with torch.no_grad():
+                p.data = perturbation_constraint(p=p.data, clean_audio=clean_audio, args=args, interp=interp, spl_thresh=spl_thresh)
         else:
             raise NotImplementedError("Optimization type not implemented")
 
         times.append(time.time() - a)
-
         if batch_idx in report_points:
             log_helpers.log_train_progress(batch_idx, total_batches, ctc_scores, wer_scores, times)
 

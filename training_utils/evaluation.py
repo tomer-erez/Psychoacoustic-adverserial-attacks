@@ -22,7 +22,7 @@ def evaluate(args, eval_data_loader, p, model, processor, wer_metric, perturbed=
                 model=model
             )
             ctc_scores.append(loss.item())
-            wer = loss_helpers.compute_wer_loss(logits, target_texts, processor, wer_metric)
+            wer = loss_helpers.compute_wer(logits, target_texts, processor, wer_metric)
             wer_scores.append(wer)
     avg_ctc = sum(ctc_scores) / len(ctc_scores) if ctc_scores else float('inf')
     avg_wer = sum(wer_scores) / len(wer_scores) if wer_scores else float('inf')
