@@ -61,7 +61,9 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, interp, wer
 
     total_batches = len(train_data_loader)
     report_points = set([int(r * total_batches) for r in [0.0, 0.25, 0.50, 0.75, 1]])
-    direction = -1 if args.attack_mode == "untargeted" else 1
+    direction = +1 if args.attack_mode == "untargeted" else -1
+    #untargeted-> increase loss -> positive (+1)
+    #targeted-> reduce loss -> negative (-1)
 
     for batch_idx, (clean_audio, target_texts) in enumerate(train_data_loader):
         a = time.time()
@@ -80,16 +82,18 @@ def train_epoch(args, train_data_loader, p, model, epoch, processor, interp, wer
         wer = loss_helpers.compute_wer(logits=logits, target_texts=target_texts, processor=processor, wer_metric=wer_metric)
         wer_scores.append(wer)
 
+        # untargeted-> increase loss -> positive (+1)
+        # targeted-> reduce loss -> negative (-1)
         if args.optimizer_type == "pgd":
             (direction * loss).backward()
             with torch.no_grad():
-                p = p + direction * args.lr * p.grad.sign()
+                p = p +  args.lr * p.grad.sign()
                 p = perturbation_constraint(p=p, clean_audio=clean_audio, args=args, interp=interp,spl_thresh=spl_thresh)
             p = p.detach().requires_grad_()
 
         elif args.optimizer_type == "adam":
             optimizer.zero_grad()
-            (direction * loss).backward()
+            (-1 * direction * loss).backward()
             optimizer.step()
             with torch.no_grad():
                 p.data = perturbation_constraint(p=p.data, clean_audio=clean_audio, args=args, interp=interp, spl_thresh=spl_thresh)
