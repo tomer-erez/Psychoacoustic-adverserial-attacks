@@ -1,3 +1,6 @@
+####took the script as is from equakl loudness contours
+### credit to?
+####
 from typing import Union
 from types import MappingProxyType
 import os

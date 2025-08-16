@@ -349,6 +349,7 @@ def init_perturbation(args,length,spl_thresh,interp,first_batch_data):
 
 
 def init_phon_threshold_tensor(args):
+    #creates frequency-dependent thresholds based on human hearing sensitivity
     freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).cpu().numpy()
     spl_thresh_np = elc.elc(args.max_phon_level, freqs)
     spl_thresh = torch.tensor(spl_thresh_np, dtype=torch.float32, device=args.device)
