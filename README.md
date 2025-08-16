@@ -25,8 +25,8 @@ supporting attacks vs the test set of libreespeech(clean english, Audio-book rea
 First, install the environment using the provided Conda file:
 
 ```bash
-conda env create -f cs236207.yaml
-conda activate cs236207
+conda env create -f env.yaml
+conda activate paa
 ```
 
 ---
