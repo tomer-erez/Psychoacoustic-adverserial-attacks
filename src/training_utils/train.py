@@ -78,15 +78,17 @@ def perturbation_constraint(
     Keeps p as a Tensor (not Parameter). No grads through the projection.
     """
     with torch.no_grad():
+        #frequency based norms
         if args.norm_type in ["fletcher_munson", "min_max_freqs", "max_phon"]:
             p = _project_frequency_domain(p, args=args, interp=interp, spl_thresh=spl_thresh, clean_audio=clean_audio)
+        #not frequency based norms
         elif args.norm_type == "l2":
             p = projections.project_l2(p, args.l2_size)
         elif args.norm_type == "linf":
             p = projections.project_linf(p, -args.linf_size, args.linf_size)
         elif args.norm_type == "snr":
             if clean_audio is None:
-                raise ValueError("SNR projection requires clean_audio")
+                raise ValueError("SNR projection requires clean_audio ro compare to")
             p = projections.project_snr(clean=clean_audio, perturbation=p, snr_db=args.snr_db)
         elif args.norm_type == "tv":
             if clean_audio is None:
@@ -99,16 +101,9 @@ def perturbation_constraint(
 
 
 def train_epoch(
-    args,
-    train_data_loader,
-    p: torch.Tensor,
-    model,
-    epoch: int,
-    processor,
-    interp,
-    wer_metric,
-    spl_thresh,
-    optimizer: torch.optim.Optimizer | None,
+    args,train_data_loader,p: torch.Tensor,
+    model,epoch: int,processor,interp,
+    wer_metric,spl_thresh,optimizer: torch.optim.Optimizer | None,
 ) -> TrainEpochResult:
     """
     One epoch optimizing a *universal* perturbation `p` over the train loader.
@@ -116,19 +111,19 @@ def train_epoch(
     PGD: sign ascent/descent on `p` with projection.
     Adam: treat `p` as a parameter (we'll modify `p.data` and project).
     """
-    ctc_scores: list[float] = []
-    wer_scores: list[float] = []
-    times: list[float] = []
+    ctc_scores= []
+    wer_scores= []
+    times= []
 
     model.eval()  # ASR model in eval; we only optimize `p`
 
-    logger.info("=" * 60)
+
     logger.info("timestamp: %s | starting epoch: %d", datetime.now(), epoch)
 
     # Untargeted: increase loss (+1); Targeted: reduce loss (-1)
     direction = +1 if args.attack_mode == "untargeted" else -1
 
-    for batch_idx, (clean_audio, target_texts) in enumerate(train_data_loader):
+    for clean_audio, target_texts in train_data_loader:
         t0 = time.perf_counter()
 
         clean_audio = clean_audio.to(args.device, non_blocking=True)

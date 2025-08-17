@@ -1,48 +1,27 @@
 import torch
-import os
 from core import iso
 from training_utils import scoring_helpers,evaluation, train, parser, save, log_helpers, build
 import evaluate as hf_evaluate
 import uuid
-from training_utils import tensor_board_logging
+from training_utils import tensor_board_logging #TODO
 from pathlib import Path
 import logging
 
-
-logger = logging.getLogger(__name__)
-
-
-def _evaluate_split( #evaluate a split from the loader, returns the wer and ctc scores
-    args,data_loader,
-    model,processor,
-    wer_metric,p,
-    perturbed: bool,epoch: int,
-    ) -> scoring_helpers.Scores:
-    with torch.inference_mode(): #same as no grad, newer version 
-        ctc, wer = evaluation.evaluate(
-            args=args,
-            eval_data_loader=data_loader,
-            p=p,
-            model=model,
-            wer_metric=wer_metric,
-            perturbed=perturbed,
-            epoch_number=epoch,
-            processor=processor,
-        )
-    return scoring_helpers.Scores(ctc=ctc, wer=wer)
 
 
 
 def main(args):
     # --- setup ---------------------------------------------------------------
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    start_epoch = build.create_logger(args=args)  # keeps your existing logger setup
+    logger,start_epoch = build.create_logger(args=args)  # keeps your existing logger setup
     logger.info("Using device: %s", device)
     
-    # Build psychoacoustic tools and data/model
-    interp = iso.build_weight_interpolator()#interpolator for iso226 curve weighting
-    spl_thresh = build.init_phon_threshold_tensor(args=args)
-
+    # Build psychoacoustic tools
+    #Builds a 2D interpolator w(phon, freq) , weight in [0,1].
+    interp = iso.build_weight_interpolator()#interpolator for iso226 curve weighting. if you sampled a 2D map weights[phon, freq] from ISO-226 RegularGridInterpolator lets you ask:“What’s the perceptual penalty weight at phon=63.2 and freq=912 Hz?
+    spl_thresh = build.init_phon_threshold_tensor(args=args)#for projecting according to max phon
+    
+    #data,model
     train_loader, eval_loader, test_loader, audio_len = build.create_data_loaders(args=args)
     model, processor = build.load_model(args)
     wer_metric = hf_evaluate.load(path="wer", experiment_id=str(uuid.uuid4()))
@@ -55,20 +34,22 @@ def main(args):
         interp=interp,
         first_batch_data=None,  # <- prefer handling inside build.init_perturbation????
     )
+    
     optimizer, scheduler = build.create_optimizer(args=args, p=p)
 
-    # Tracking
-    train_ctc_hist: list[float] = []
-    train_wer_hist: list[float] = []
-    eval_clean_ctc_hist: list[float] = []
-    eval_clean_wer_hist: list[float] = []
-    eval_pert_ctc_hist: list[float] = []
-    eval_pert_wer_hist: list[float] = []
+    # Tracking results
+    train_ctc_hist = []
+    train_wer_hist = []
+    eval_clean_ctc_hist = []
+    eval_clean_wer_hist = []
+    eval_pert_ctc_hist = []
+    eval_pert_wer_hist = []
 
+    #tracking
     best_epoch = -1
     no_improve_epochs = 0
     best_eval_score = float("inf") if args.attack_mode == "targeted" else float("-inf")
-    finished_training = False
+
 
     # Paths
     save_dir = Path(args.save_dir)
@@ -78,6 +59,7 @@ def main(args):
     try:
         # --- training loop ---------------------------------------------------
         for epoch in range(start_epoch, args.num_epochs):
+
             # Train perturbation
             p, tr_ctc, tr_wer = train.train_epoch(
                 args=args,
@@ -95,7 +77,7 @@ def main(args):
             train_wer_hist.append(tr_wer)
 
             # Evaluate clean recordiongs
-            clean = _evaluate_split(
+            clean = evaluation.evaluate(
                 args=args,
                 data_loader=eval_loader,
                 model=model,
@@ -109,7 +91,7 @@ def main(args):
             eval_clean_wer_hist.append(clean.wer)
 
             # Evaluate perturbed records
-            pert = _evaluate_split(
+            pert = evaluation.evaluate(
                 args=args,
                 data_loader=eval_loader,
                 model=model,
@@ -122,7 +104,7 @@ def main(args):
             eval_pert_ctc_hist.append(pert.ctc)
             eval_pert_wer_hist.append(pert.wer)
 
-            # Epoch logging, try to minimicze the prints so its clearer plz!
+            # Epoch logging, try to minimicze the prints so its clearer plz! #TODO
             log_helpers.log_epoch_metrics(
                 epoch,
                 args.num_epochs,
@@ -207,7 +189,7 @@ def main(args):
         finished_training = True
         
         #perturbed test (applyiong p)
-        pert_test = _evaluate_split(
+        pert_test = evaluation.evaluate(
             args=args,
             data_loader=test_loader,
             model=model,
@@ -218,7 +200,7 @@ def main(args):
             epoch=-1,
         )
         #clean test (no p)
-        clean_test = _evaluate_split(
+        clean_test = evaluation.evaluate(
             args=args,
             data_loader=test_loader,
             model=model,
@@ -260,7 +242,7 @@ def main(args):
             best_epoch=best_epoch,
         )
 
-        # TensorBoard summary. tracking The long term scoring results
+        # TODO TensorBoard summary. tracking The long term scoring results
         # tensor_board_logging.log_experiment_to_tensorboard(
         #     save_dir=args.tensorboard_logger,
         #     norm_type=args.norm_type,
@@ -299,4 +281,4 @@ def main(args):
 
 if __name__ == "__main__":
     train_args = parser.create_arg_parser().parse_args()
-    exit(main(args=train_args))
+    exit(code=main(args=train_args))

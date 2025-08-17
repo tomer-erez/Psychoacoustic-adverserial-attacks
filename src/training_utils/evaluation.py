@@ -1,8 +1,9 @@
 import torch
 from core import loss_helpers
-
+import scoring_helpers
 
 def evaluate(args, eval_data_loader, p, model, processor, wer_metric, perturbed=False, epoch_number=-1):
+    """running the evaluate loop on the evaluation/test data loader, adding p to data if needed"""
     model.eval()
     ctc_scores, wer_scores = [], []
 
@@ -14,7 +15,7 @@ def evaluate(args, eval_data_loader, p, model, processor, wer_metric, perturbed=
             if perturbed:
                 data = data + p
 
-            loss, logits = loss_helpers.get_loss(
+            loss, logits = loss_helpers.get_loss( #according to the hf of the model needs special loss extraction
                 batch_waveforms=data,
                 target_texts=target_texts,
                 processor=processor,
@@ -27,5 +28,4 @@ def evaluate(args, eval_data_loader, p, model, processor, wer_metric, perturbed=
     avg_ctc = sum(ctc_scores) / len(ctc_scores) if ctc_scores else float('inf')
     avg_wer = sum(wer_scores) / len(wer_scores) if wer_scores else float('inf')
 
-    return avg_ctc, avg_wer
-
+    return scoring_helpers.Scores(ctc=avg_ctc, wer=avg_wer)
