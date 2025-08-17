@@ -9,6 +9,7 @@ import os
 import numpy as np
 
 def save_audio(filename, tensor, sample_rate=16000, amplify=1.0):
+    """saves a recording"""
     tensor = tensor.detach().cpu()
     # Optional amplification (e.g. if you want to play it and the original perturbation is completely un-detectable)
     tensor = tensor * amplify

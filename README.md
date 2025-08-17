@@ -36,10 +36,12 @@ conda activate paa
 To run the full training + attack pipeline:
 
 ```bash
+cd src
+
 #targeted
-python main.py --attack_mode targeted --target "delete" --norm_type snr --snr_db 40 
+python run_attack.py --attack_mode targeted --target "delete" --norm_type snr --snr_db 40 
 #untargeted
-python main.py --attack_mode untargeted  --norm_type max_phon --max_phon_level 20 
+python run_attack.py --attack_mode untargeted  --norm_type max_phon --max_phon_level 20 
 ```
 You can specify various command-line arguments to control the attack (see **Hyperparameters** below, or the [`training_utils/parser.py`](training_utils/parser.py) file).
 
