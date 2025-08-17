@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from training_utils import save
 
+def scale_to_norm():
+    #TODO shared scale to norm func
+    pass
+
+
 def project_snr(clean, perturbation, snr_db):
     """
     Ensures the perturbation has SNR > snr_db (in dB) relative to clean signal.
