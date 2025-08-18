@@ -111,6 +111,7 @@ def train_epoch(
     PGD: sign ascent/descent on `p` with projection.
     Adam: treat `p` as a parameter (we'll modify `p.data` and project).
     """
+    #TODO : cleaner calls to the deatach, requires_grad, no grad ...calls
     ctc_scores= []
     wer_scores= []
     times= []
@@ -132,7 +133,7 @@ def train_epoch(
         # Prepare `p` for grad
         p.requires_grad_(True)
 
-        # Compose and clamp to audio range ([-1, 1] typical) simulates mics filters/sotware filter
+        # Compose and clamp to audio range ([-1, 1] typical) to match micrhophone's filters/sotware filters
         perturbed = (clean_audio + p).clamp_(-1.0, 1.0)
 
         # Forward + loss
@@ -156,12 +157,13 @@ def train_epoch(
         if args.optimizer_type == "pgd":
             # maximize loss for untargeted; minimize for targeted
             (direction * loss).backward()
-            #update without grads
-            with torch.no_grad():
-                p.add_(args.lr * p.grad.sign())
-                p = perturbation_constraint(p=p, clean_audio=clean_audio, args=args, interp=interp, spl_thresh=spl_thresh)
+            #update without grads - MANUAL UPDATE OF THE GRAD ACCORDING TO THE PGD LOGIC, backwards() call is not needed
+            with torch.no_grad(): 
+                p.add_(args.lr * p.grad.sign()) #step
+                p = perturbation_constraint(p=p, clean_audio=clean_audio, args=args, interp=interp, spl_thresh=spl_thresh) # project to the allowed pert size
             # reset leaf for next batch (clears .grad)
             p = p.detach()
+
         elif args.optimizer_type == "adam":
             if optimizer is None:
                 raise ValueError("Adam optimizer selected but optimizer is None")

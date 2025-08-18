@@ -4,7 +4,7 @@ This project explores adversarial attacks on automatic speech recognition (ASR) 
 with a focus on crafting **perturbations that are difficult for humans to perceive** but significantly degrade model performance.
 
 We investigate how different norm types (e.g. Total variation, Signal to noise ratio, equal loudness contours) 
-and perturbation sizes affect both the model's predictions and the human perceptibility of the perturbation. 
+and perturbation size affect both the model's predictions and the human perceptibility of the perturbation. 
 Our goal is to develop attacks that are **effective yet stealthy** — confusing the model while remaining inaudible to the human ear.
 
 targeted(encourage a malicious command, e.g. "delete all files") and untargeted attacks can be run.
@@ -12,7 +12,7 @@ targeted(encourage a malicious command, e.g. "delete all files") and untargeted 
 
 ---
 
-## 🎧 Model and Dataset
+##  Model and Dataset
 
 attacking the Wav2vec2 model by meta, which was trained on libreelight and libreespeech.
 
@@ -20,7 +20,7 @@ supporting attacks vs the test set of libreespeech(clean english, Audio-book rea
 
 ---
 
-## 📦 Requirements
+##  Requirements
 
 First, install the environment using the provided Conda file:
 
@@ -31,7 +31,7 @@ conda activate paa
 
 ---
 
-## 🚀 Running the Project
+##  Running the Project
 
 To run the full training + attack pipeline:
 
@@ -48,7 +48,7 @@ You can specify various command-line arguments to control the attack (see **Hype
 ---
 
 
-## ⚙️ Key Hyperparameters
+##  Key Hyperparameters
 
 You can control the behavior of the attack using the following command-line arguments:
 
@@ -118,7 +118,7 @@ python data_plots/grab_results.py
 
 ---
 
-## 👤 Author
+##  Author
 
 **Tomer Erez**  
 MSc Computer science, Technion – Israel Institute of Technology  
@@ -126,7 +126,7 @@ MSc Computer science, Technion – Israel Institute of Technology
 
 ---
 
-## 📄 License
+##  License
 
 This project is for academic and research purposes only. Feel free to use and adapt it with credit.
 

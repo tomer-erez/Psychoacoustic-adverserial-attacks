@@ -5,7 +5,7 @@ import evaluate as hf_evaluate
 import uuid
 from training_utils import tensor_board_logging #TODO
 from pathlib import Path
-import logging
+
 
 
 
@@ -17,16 +17,16 @@ def main(args):
     logger.info("Using device: %s", device)
     
     # Build psychoacoustic tools
-    #Builds a 2D interpolator w(phon, freq) , weight in [0,1].
+    #Builds a 2D interpolator:  penalty_weight=interp_phon(phon, freq) , weight in [0,1].
     interp = iso.build_weight_interpolator()#interpolator for iso226 curve weighting. if you sampled a 2D map weights[phon, freq] from ISO-226 RegularGridInterpolator lets you ask:“What’s the perceptual penalty weight at phon=63.2 and freq=912 Hz?
-    spl_thresh = build.init_phon_threshold_tensor(args=args)#for projecting according to max phon
+    spl_thresh = build.init_phon_threshold_tensor(args=args)#for projecting according to max phon. creates a max phon allowed limit
     
-    #data,model
+    #data,model,wer metricc
     train_loader, eval_loader, test_loader, audio_len = build.create_data_loaders(args=args)
     model, processor = build.load_model(args)
     wer_metric = hf_evaluate.load(path="wer", experiment_id=str(uuid.uuid4()))
 
-    # Initialize perturbation and optimizer/scheduler
+    # Initialize perturbation
     p = build.init_perturbation(
         spl_thresh=spl_thresh,
         args=args,
@@ -34,7 +34,7 @@ def main(args):
         interp=interp,
         first_batch_data=None,  # <- prefer handling inside build.init_perturbation????
     )
-    
+    #opt, sched and link it to the perturbation 
     optimizer, scheduler = build.create_optimizer(args=args, p=p)
 
     # Tracking results

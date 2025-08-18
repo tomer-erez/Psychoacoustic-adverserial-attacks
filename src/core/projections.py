@@ -1,15 +1,18 @@
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
 from training_utils import save
 
-def scale_to_norm():
-    #TODO shared scale to norm func
-    pass
+
+# def scale_to_norm(signal,current_norm, target_norm, eps=1e-8):
+#     if current_norm<=target_norm:
+#         return signal
+        #TODO shared scale to norm func
+#     pass
 
 
 def project_snr(clean, perturbation, snr_db):
     """
+    SNR FORMULA: snr = 10 * log_10 (power_signal / power_noise)
+
     Ensures the perturbation has SNR > snr_db (in dB) relative to clean signal.
     If SNR is already high enough, returns unchanged.
     Otherwise, rescales perturbation to match the target SNR.
@@ -24,13 +27,11 @@ def project_snr(clean, perturbation, snr_db):
         return perturbation  # Already satisfies SNR requirement
     # Otherwise, project to match target SNR
 
-    snr_linear = 10 ** (snr_db / 10) #convert to a linear scale #
-    target_noise_power = signal_power / snr_linear #the power the noise should have to hit the target SNR.
-    target_norm = torch.sqrt(target_noise_power * clean.numel()) #the norm is the energy: num elements times allowed noise
+    snr_linear = 10 ** (snr_db / 10) #convert to a linear scale: is the allowed noise-to-signal ratio in linear units (threshold)
+    target_noise_power = signal_power / snr_linear #computes the maximum noise power allowed while still meeting the SNR requirement.
+    target_norm = torch.sqrt(target_noise_power * clean.numel()) #computes the max L2 norm of the perturbation given the desired SNR
 
     current_norm = torch.norm(perturbation.view(-1), p=2)#flatten to 1d
-    if current_norm < 1e-8:
-        return perturbation  # Nothing to scale
 
     return perturbation * (target_norm / current_norm)
 
@@ -46,11 +47,10 @@ def project_l2(p, epsilon):
     return p
 
 
-def project_l1(p, args):
-    #l1 norm, TODO unite with L2 with param norm_p?
+def project_l1(p, epsilon):
     norm = torch.norm(p, p=1)
-    if norm > args.l1_epsilon:
-        return p * (args.l1_epsilon / norm)
+    if norm > epsilon:
+        return p * (epsilon / norm)
     return p
 
 def project_tv(p, args, clean_audio):
@@ -74,7 +74,7 @@ def project_min_max_freqs(args,stft_p, min_freq, max_freq):
     freqs = torch.fft.rfftfreq(n=args.n_fft, d=1 / args.sr).to(stft_p.device)#all freq bins that build the stft
     # Mask: 1 where freqs < min or freqs > max
     mask = ((freqs < min_freq) | (freqs > max_freq)).float() #zeros ouside the band, 1s inside
-    mask = mask.view(1, -1, 1)  # Match (batch, freq, time)
+    mask = mask.view(1, -1, 1)  # Match (batch, freq, time) allows mask multiplication
     # Apply mask
     stft_p = stft_p * mask#zero outside the band, 1s inside
     return stft_p
@@ -146,11 +146,10 @@ def project_phon_level(stft_p, args, spl_thresh, plot_debug=False, tag=""):
     # e.g., 40 dB in STFT space = 0 phon (threshold of hearing)
     scaled_thresh = spl_thresh - spl_thresh.max() + args.phon_reference_db
 
-    # Clip STFT magnitudes that exceed the scaled contour
-    exceed_mask = mag_db > scaled_thresh
-    mag_db_clipped = torch.where(exceed_mask, scaled_thresh, mag_db)
-    mag_clipped = 10 ** (mag_db_clipped / 20)
-    stft_p_clipped = mag_clipped * torch.exp(1j * stft_p.angle())
+    # CLIP STFT magnitudes that exceed the scaled contour
+    mag_db_clipped = torch.where(mag_db > scaled_thresh, scaled_thresh, mag_db) #everrywher magnitude moire than
+    mag_clipped = 10 ** (mag_db_clipped / 20) ##linear scale
+    stft_p_clipped = mag_clipped * torch.exp(1j * stft_p.angle()) #angle stays same, reduceed magnitude applied to rebuiult the stft
 
     # Plot debug info if requested
     if plot_debug:

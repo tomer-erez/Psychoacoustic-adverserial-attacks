@@ -62,7 +62,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate cs236207
 
 # === Run experiment ===
-python main.py {base_args}
+python ./src/run_attack.py {base_args}
 '''
 
     # Write the script to file

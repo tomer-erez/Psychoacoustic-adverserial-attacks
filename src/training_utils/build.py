@@ -291,8 +291,9 @@ def init_perturbation(args, length, spl_thresh, interp, first_batch_data):
     If resuming, loads from checkpoint and validates length.
     """
     logger = logging.getLogger("asr_attack")
+    
+    #check if resuming or train from scratch
     ckpt_path = getattr(args, "resume_from", None)
-
     if ckpt_path and os.path.isfile(ckpt_path):
         logger.info(f"Resuming perturbation from: {ckpt_path}")
         loaded = torch.load(ckpt_path, map_location=args.device)
